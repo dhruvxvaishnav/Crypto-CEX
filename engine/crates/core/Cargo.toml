@@ -1,0 +1,12 @@
+[package]
+name = "cex-core"
+description = "Deterministic matching engine domain core for Aether."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

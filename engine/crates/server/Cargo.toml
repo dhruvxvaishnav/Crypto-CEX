@@ -1,0 +1,12 @@
+[package]
+name = "cex-server"
+description = "Matching engine server binary for Aether."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,7 +1,8 @@
-AGENTS.md
 CLAUDE.md
 GEMINI.md
-PRD.md
+/ProjectProgress.md
+/web/AGENTS.md
+/web/CLAUDE.md
 .DS_STORE
 .idea/
 .vscode/
@@ -10,3 +11,25 @@ PRD.md
 *.bak
 *.swp
 *.swo
+
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Build output
+.next/
+web/.next/
+dist/
+target/
+coverage/
+playwright-report/
+test-results/
+web/test-results/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Package-manager state
+.pnpm-store/

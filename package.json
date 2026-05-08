@@ -1,0 +1,25 @@
+{
+  "name": "aether",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.0.8",
+  "scripts": {
+    "build": "pnpm --filter @aether/shared build && pnpm --filter @aether/web build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && cargo check --manifest-path engine/Cargo.toml --workspace",
+    "dev": "bash scripts/dev.sh",
+    "e2e": "bash scripts/e2e.sh",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "test": "pnpm --filter @aether/shared test && pnpm --filter @aether/web test",
+    "typecheck": "pnpm --filter @aether/shared typecheck && pnpm --filter @aether/web typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.14",
+    "typescript": "6.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/proto",
+    "crates/server",
+]
+resolver = "2"
+
+[workspace.package]
+authors = ["Mr. Stark"]
+edition = "2021"
+license = "MIT"
+rust-version = "1.82.0"
+version = "0.1.0"
+
+[workspace.dependencies]
+anyhow = "1.0"
+criterion = "0.5"
+proptest = "1.5"
+rust_decimal = "1.36"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.42", features = ["full"] }
+tokio-util = "0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+uuid = { version = "1.11", features = ["serde", "v4"] }
+
+[workspace.lints.rust]
+non_snake_case = "deny"
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+expect_used = "deny"
+float_arithmetic = "deny"
+indexing_slicing = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+nursery = { level = "warn", priority = -1 }
+panic = "deny"
+pedantic = { level = "warn", priority = -1 }
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"

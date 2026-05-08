@@ -1,0 +1,12 @@
+[package]
+name = "cex-proto"
+description = "Engine wire protocol types for Aether."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
