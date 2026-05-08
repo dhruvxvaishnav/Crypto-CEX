@@ -1,0 +1,10 @@
+AGENTS.md
+PRD.md
+.DS_STORE
+.idea/
+.vscode/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
