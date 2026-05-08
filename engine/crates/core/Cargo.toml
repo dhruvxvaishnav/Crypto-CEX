@@ -7,6 +7,18 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "matching"
+harness = false
 
 [lints]
 workspace = true

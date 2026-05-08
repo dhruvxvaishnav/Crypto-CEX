@@ -1,5 +1,8 @@
 //! Deterministic matching engine domain core.
 
+pub mod book;
+pub mod types;
+
 /// Canonical crate name for diagnostics and metrics labels.
 pub const CRATE_NAME: &str = "cex-core";
 
