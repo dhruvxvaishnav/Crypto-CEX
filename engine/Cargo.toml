@@ -15,10 +15,15 @@ version = "0.1.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
+# PRD §14.6: WAL format is "length-prefixed bincode-serialised events"
+bincode = "1"
 criterion = "0.5"
 proptest = "1.4"
-rust_decimal = "=1.36.0"
-serde = { version = "1.0", features = ["derive"] }
+# serde-str: makes Decimal deserialize from strings (required for bincode compat; also
+# correct per AGENTS.md §3.13 — prices serialised as strings on the wire).
+rust_decimal = { version = "=1.36.0", features = ["serde-str"] }
+# rc: enables Arc<T>/Rc<T> Serialize/Deserialize (needed for Order.symbol: Arc<str>).
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1.42", features = ["full"] }

@@ -78,6 +78,7 @@ The frontend uses the latest stable line explicitly approved on **2026-05-09**: 
 
 When sources conflict, the higher entry wins:
 
+0. **`ProjectProgress.md`** — live implementation progress board. Every agent **MUST** read this file at the start of each session, before writing any code, to establish exactly what has already been built and what remains. It is git-ignored (scratch board only) but authoritative for current state.
 1. **`PRD.md`** — product requirements. Defines what.
 2. **`AGENTS.md`** (this file) — coding rules. Defines how.
 3. **`docs/adr/*`** — architecture decisions, dated.
