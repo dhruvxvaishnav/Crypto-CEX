@@ -15,3 +15,7 @@ All notable changes to Aether are recorded here.
 ### Engine
 
 - Added Day 4A engine TCP server and protocol spine: framed JSON wire types, loopback listener, WAL-backed command routing, durable sequenced event broadcast, snapshots, and TCP integration tests.
+
+### API
+
+- Added Day 4B API skeleton and auth slice: Axum service crate, health/readiness routes, request IDs, error envelope, structured logs, engine readiness client, signup/login/refresh auth, argon2id password hashing, JWT access tokens, and refresh-token rotation.

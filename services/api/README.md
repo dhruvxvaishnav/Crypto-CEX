@@ -6,11 +6,18 @@ Rust Axum gateway for HTTP, WebSocket, auth, validation, rate limiting, and engi
 
 ## Run Locally
 
-The service crate lands in Day 4 of the PRD plan.
+```bash
+cargo run --manifest-path services/Cargo.toml -p cex-api
+```
+
+Required environment is listed in `.env.example`. The API binds to `API_HOST:API_PORT`
+and checks Postgres plus the matching engine for `/ready`.
 
 ## Test
 
-Run service tests from the service directory once the crate exists.
+```bash
+cargo test --manifest-path services/Cargo.toml --workspace
+```
 
 ## Spec
 
