@@ -7,6 +7,18 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
+cex-core = { path = "../core" }
+cex-proto = { path = "../proto" }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

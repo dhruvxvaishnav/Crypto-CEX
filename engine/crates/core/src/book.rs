@@ -26,6 +26,15 @@ pub enum EngineEvent {
     StopTriggered { order_id: Uuid },
 }
 
+/// Aggregated L2 book depth, best price first on both sides.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BookDepth {
+    /// Bid levels as `(price, total_quantity)`, highest price first.
+    pub bids: Vec<(Decimal, Decimal)>,
+    /// Ask levels as `(price, total_quantity)`, lowest price first.
+    pub asks: Vec<(Decimal, Decimal)>,
+}
+
 /// Snapshot of a maker at the front of a price level, gathered via immutable borrow.
 struct PeekedMaker {
     id: Uuid,
@@ -185,6 +194,30 @@ impl OrderBook {
             .map(|o| o.remaining)
             .sum();
         (bid, ask)
+    }
+
+    /// Returns aggregated L2 depth, capped to `depth` price levels per side.
+    ///
+    /// The output is ordered the way market-data clients consume it: bids are
+    /// highest-first and asks are lowest-first.
+    #[must_use]
+    pub fn depth_levels(&self, depth: usize) -> BookDepth {
+        let bids = self
+            .bids
+            .iter()
+            .rev()
+            .take(depth)
+            .map(|(price, orders)| (*price, orders.iter().map(|o| o.remaining).sum()))
+            .filter(|(_, quantity)| *quantity > Decimal::ZERO)
+            .collect();
+        let asks = self
+            .asks
+            .iter()
+            .take(depth)
+            .map(|(price, orders)| (*price, orders.iter().map(|o| o.remaining).sum()))
+            .filter(|(_, quantity)| *quantity > Decimal::ZERO)
+            .collect();
+        BookDepth { bids, asks }
     }
 
     /// Rebuilds the `order_index` from the resting `bids` and `asks`.
