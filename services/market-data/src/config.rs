@@ -1,8 +1,11 @@
 use std::env;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use thiserror::Error;
 
+const DEFAULT_ENGINE_TIMEOUT_MS: u64 = 200;
+const DEFAULT_ENGINE_PORT: u16 = 7_878;
 const DEFAULT_REFRESH_MS: u64 = 2_000;
 const DEFAULT_STALE_AFTER_MS: u64 = 30_000;
 
@@ -11,6 +14,10 @@ const DEFAULT_STALE_AFTER_MS: u64 = 30_000;
 pub struct Config {
     /// Postgres connection string.
     pub database_url: String,
+    /// Engine TCP address.
+    pub engine_addr: SocketAddr,
+    /// Engine request timeout.
+    pub engine_timeout: Duration,
     /// Market-maker quote refresh interval.
     pub quote_refresh_interval: Duration,
     /// Maximum allowed upstream feed age before quoting stops.
@@ -42,6 +49,17 @@ impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             database_url: required("DATABASE_URL")?,
+            engine_addr: SocketAddr::new(
+                parse_ip(
+                    "ENGINE_HOST",
+                    &optional("ENGINE_HOST").unwrap_or_else(|| "127.0.0.1".to_owned()),
+                )?,
+                parse_u16("ENGINE_PORT", DEFAULT_ENGINE_PORT)?,
+            ),
+            engine_timeout: Duration::from_millis(parse_ms(
+                "MARKET_DATA_ENGINE_TIMEOUT_MS",
+                DEFAULT_ENGINE_TIMEOUT_MS,
+            )?),
             quote_refresh_interval: Duration::from_millis(parse_ms(
                 "MARKET_DATA_QUOTE_REFRESH_MS",
                 DEFAULT_REFRESH_MS,
@@ -69,4 +87,26 @@ fn optional(name: &'static str) -> Option<String> {
 
 fn required(name: &'static str) -> Result<String, ConfigError> {
     optional(name).ok_or(ConfigError::Missing(name))
+}
+
+fn parse_ip(name: &'static str, value: &str) -> Result<IpAddr, ConfigError> {
+    value.parse::<IpAddr>().or_else(|_| {
+        if value == "localhost" {
+            Ok(IpAddr::V4(Ipv4Addr::LOCALHOST))
+        } else {
+            Err(ConfigError::Invalid {
+                name,
+                reason: "must be an IP address or localhost".to_owned(),
+            })
+        }
+    })
+}
+
+fn parse_u16(name: &'static str, default: u16) -> Result<u16, ConfigError> {
+    optional(name).map_or(Ok(default), |value| {
+        value.parse::<u16>().map_err(|error| ConfigError::Invalid {
+            name,
+            reason: error.to_string(),
+        })
+    })
 }

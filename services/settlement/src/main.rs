@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use cex_settlement::{Config, PostgresSettlement};
+use cex_settlement::{Config, EngineEventBridge, PostgresSettlement};
 use sqlx::postgres::{PgListener, PgPoolOptions};
 use tracing_subscriber::EnvFilter;
 
@@ -30,9 +30,27 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("listening for engine event notifications")?;
 
-    let settlement = PostgresSettlement::new(pool);
+    let settlement = PostgresSettlement::new(pool.clone());
+    let bridge = EngineEventBridge::new(pool, config.engine_addr);
+    let bridge_reconnect_interval = config.bridge_reconnect_interval;
+    let bridge_task = tokio::spawn(async move {
+        loop {
+            if let Err(error) = bridge.run_once().await {
+                tracing::warn!(error = %error, "settlement.bridge.reconnecting");
+            }
+            tokio::time::sleep(bridge_reconnect_interval).await;
+        }
+    });
+
     tracing::info!("settlement.worker.started");
-    run(settlement, listener, config.poll_interval).await
+    let result = run(settlement, listener, config.poll_interval).await;
+    bridge_task.abort();
+    if let Err(error) = bridge_task.await {
+        if !error.is_cancelled() {
+            return Err(error).context("joining engine event bridge task");
+        }
+    }
+    result
 }
 
 async fn run(

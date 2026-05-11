@@ -1,15 +1,17 @@
+use std::collections::BTreeSet;
+
 use anyhow::Context;
-use cex_market_data::binance::combined_book_ticker_url;
+use cex_market_data::binance::{default_top_usdt_symbols, run_reconnecting_stream, BinanceEvent};
+use cex_market_data::engine::EngineClient;
+use cex_market_data::market_maker::MarketMaker;
+use cex_market_data::persistence::MarketDataRepository;
 use cex_market_data::Config;
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::postgres::PgPoolOptions;
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
+const BINANCE_EVENT_CAPACITY: usize = 4_096;
 const DB_MAX_CONNECTIONS: u32 = 5;
-
-#[derive(Debug, sqlx::FromRow)]
-struct MarketRow {
-    symbol: String,
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,29 +27,59 @@ async fn main() -> anyhow::Result<()> {
         .connect(&config.database_url)
         .await
         .context("connecting to postgres")?;
-    let markets = load_active_markets(&pool)
+    let repository = MarketDataRepository::new(pool);
+    let markets = repository
+        .load_active_markets()
         .await
         .context("loading active markets")?;
-    let symbols = markets
+    let local_symbols = markets
         .into_iter()
         .map(|market| market.symbol)
         .collect::<Vec<_>>();
-    let stream_url = combined_book_ticker_url(&symbols);
+    let stream_symbols = stream_symbols(&local_symbols);
+    let market_maker_user_id = repository
+        .market_maker_user_id()
+        .await
+        .context("loading market-maker user")?;
+    let engine = EngineClient::new(config.engine_addr, config.engine_timeout);
+    let market_maker = MarketMaker::new(
+        engine,
+        market_maker_user_id,
+        config.stale_after,
+        local_symbols.clone(),
+    );
 
     tracing::info!(
-        market_count = symbols.len(),
-        stream_url,
-        "market_data.worker.configured"
+        local_market_count = local_symbols.len(),
+        stream_symbol_count = stream_symbols.len(),
+        "market_data.worker.started"
     );
-    run(config).await
+    run(repository, market_maker, stream_symbols, config).await
 }
 
-async fn run(config: Config) -> anyhow::Result<()> {
-    let mut interval = tokio::time::interval(config.quote_refresh_interval);
+async fn run(
+    repository: MarketDataRepository,
+    mut market_maker: MarketMaker,
+    symbols: Vec<String>,
+    config: Config,
+) -> anyhow::Result<()> {
+    let (event_tx, mut event_rx) = mpsc::channel(BINANCE_EVENT_CAPACITY);
+    let stream_task = tokio::spawn(run_reconnecting_stream(symbols, event_tx));
+    let mut quote_interval = tokio::time::interval(config.quote_refresh_interval);
+
     loop {
         tokio::select! {
-            _ = interval.tick() => {
-                tracing::debug!("market_data.quote_refresh.tick");
+            event = event_rx.recv() => {
+                let Some(event) = event else {
+                    break;
+                };
+                handle_event(&repository, &mut market_maker, event).await?;
+            }
+            _ = quote_interval.tick() => {
+                market_maker
+                    .refresh_quotes()
+                    .await
+                    .context("refreshing market-maker quotes")?;
             }
             signal = tokio::signal::ctrl_c() => {
                 if let Err(error) = signal {
@@ -57,18 +89,39 @@ async fn run(config: Config) -> anyhow::Result<()> {
             }
         }
     }
+
+    stream_task.abort();
+    if let Err(error) = stream_task.await {
+        if !error.is_cancelled() {
+            return Err(error).context("joining binance stream task");
+        }
+    }
     Ok(())
 }
 
-async fn load_active_markets(pool: &PgPool) -> Result<Vec<MarketRow>, sqlx::Error> {
-    sqlx::query_as::<_, MarketRow>(
-        r"
-        SELECT symbol
-        FROM markets
-        WHERE status = 'trading'
-        ORDER BY symbol
-        ",
-    )
-    .fetch_all(pool)
-    .await
+async fn handle_event(
+    repository: &MarketDataRepository,
+    market_maker: &mut MarketMaker,
+    event: BinanceEvent,
+) -> anyhow::Result<()> {
+    match event {
+        BinanceEvent::BookTicker(ticker) => {
+            market_maker.record_ticker(ticker);
+        }
+        BinanceEvent::Kline(kline) => {
+            repository
+                .upsert_kline(&kline)
+                .await
+                .context("persisting kline")?;
+        }
+    }
+    Ok(())
+}
+
+fn stream_symbols(local_symbols: &[String]) -> Vec<String> {
+    let mut symbols = default_top_usdt_symbols()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    symbols.extend(local_symbols.iter().cloned());
+    symbols.into_iter().collect()
 }

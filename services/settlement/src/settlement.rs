@@ -133,7 +133,10 @@ async fn settle_order_accepted(
     event: OrderAcceptedEvent,
 ) -> Result<(), sqlx::Error> {
     let market = fetch_market(tx, &event.order.symbol).await?;
-    insert_order(tx, &event.order, market.id).await?;
+    let inserted = insert_order(tx, &event.order, market.id).await?;
+    if !inserted {
+        return Ok(());
+    }
     let (asset_id, obligation) = lock_obligation(&event.order, &market);
     if obligation > Decimal::ZERO {
         apply_ledger(
@@ -391,8 +394,8 @@ async fn insert_order(
     tx: &mut Transaction<'_, Postgres>,
     order: &EngineOrder,
     market_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query(
         r"
         INSERT INTO orders
           (id, user_id, market_id, side, type, status, price, quantity, stop_price, display_quantity)
@@ -412,7 +415,7 @@ async fn insert_order(
     .bind(order.display_qty)
     .execute(tx.as_mut())
     .await?;
-    Ok(())
+    Ok(result.rows_affected() > 0)
 }
 
 async fn fetch_order(
