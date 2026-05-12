@@ -8,31 +8,41 @@ use serde_json::Value;
 use uuid::Uuid;
 use validator::ValidationErrors;
 
-/// Stable API error codes shared with `packages/shared/src/errors.ts`.
+/// Stable API error codes — full set per PRD §10.2.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
-    /// Invalid email address.
+    // ── Auth ─────────────────────────────────────────────────────────────
     InvalidEmail,
-    /// Password did not satisfy policy.
     WeakPassword,
-    /// Email is already registered.
     EmailTaken,
-    /// Credentials are invalid.
     InvalidCredentials,
-    /// MFA challenge is required.
     MfaRequired,
-    /// Token expired.
+    MfaInvalid,
     TokenExpired,
-    /// Token is invalid.
     TokenInvalid,
-    /// Resource or route not found.
-    NotFound,
-    /// Rate limit exceeded.
+    Forbidden,
+    // ── Trading ──────────────────────────────────────────────────────────
+    InsufficientBalance,
+    MarketHalted,
+    MarketUnknown,
+    OrderNotFound,
+    PostOnlyRejected,
+    FokNotFilled,
+    SelfTradePrevented,
+    StopPriceInvalid,
+    LotSize,
+    TickSize,
+    MinNotional,
+    IdempotencyConflict,
+    // ── Rate / Signature ─────────────────────────────────────────────────
     RateLimited,
-    /// Engine did not respond in time.
+    SigTimestamp,
+    SigReplay,
+    SigInvalid,
+    // ── Infrastructure ───────────────────────────────────────────────────
+    NotFound,
     EngineTimeout,
-    /// Internal service error.
     Internal,
 }
 

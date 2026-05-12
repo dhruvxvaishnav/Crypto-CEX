@@ -2,21 +2,51 @@ use axum::middleware::from_fn;
 use axum::routing::{get, post};
 use axum::Router;
 
+use crate::handlers::account::{faucet, get_balances, get_history, get_profile};
 use crate::handlers::auth::{login, refresh, signup};
 use crate::handlers::health::{health, ready};
+use crate::handlers::markets::{get_klines, get_market, get_orderbook, get_trades, list_markets};
+use crate::handlers::orders::{
+    cancel_all_orders, cancel_order, get_order, list_orders, place_order,
+};
+use crate::handlers::ws::ws_handler;
 use crate::middleware::{not_found, request_id};
 use crate::state::AppState;
 
-/// Builds the API router.
+/// Builds the full API router (PRD §10.3).
 pub fn build_router(state: AppState) -> Router {
-    let api_v1 = Router::new()
+    let auth_routes = Router::new()
         .route("/auth/signup", post(signup))
         .route("/auth/login", post(login))
         .route("/auth/refresh", post(refresh));
 
+    let market_routes = Router::new()
+        .route("/markets", get(list_markets))
+        .route("/markets/{symbol}", get(get_market))
+        .route("/markets/{symbol}/orderbook", get(get_orderbook))
+        .route("/markets/{symbol}/trades", get(get_trades))
+        .route("/markets/{symbol}/klines", get(get_klines));
+
+    let order_routes = Router::new()
+        .route("/orders", post(place_order).delete(cancel_all_orders).get(list_orders))
+        .route("/orders/{id}", get(get_order).delete(cancel_order));
+
+    let account_routes = Router::new()
+        .route("/account", get(get_profile))
+        .route("/account/balances", get(get_balances))
+        .route("/account/history", get(get_history))
+        .route("/wallet/faucet", post(faucet));
+
+    let api_v1 = Router::new()
+        .merge(auth_routes)
+        .merge(market_routes)
+        .merge(order_routes)
+        .merge(account_routes);
+
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .route("/ws", get(ws_handler))
         .nest("/api/v1", api_v1)
         .fallback(not_found)
         .with_state(state)
@@ -42,6 +72,7 @@ mod tests {
     use crate::readiness::tests::StaticReadiness;
     use crate::repositories::memory::MemoryAuthRepository;
     use crate::state::AppState;
+    use crate::ws::hub::Hub;
 
     use super::build_router;
 
@@ -127,22 +158,37 @@ mod tests {
 
     fn test_state() -> AppState {
         let repository = MemoryAuthRepository::shared();
-        let token_config = TokenConfig {
-            jwt_secret: "test-secret-that-is-long-enough-for-hs256".to_owned(),
+        let jwt_secret = "test-secret-that-is-long-enough-for-hs256".to_owned();
+        let token_config = Arc::new(TokenConfig {
+            jwt_secret: jwt_secret.clone(),
             access_token_ttl: Duration::from_secs(900),
             mfa_token_ttl: Duration::from_secs(300),
             refresh_token_ttl: Duration::from_secs(30 * 24 * 60 * 60),
-        };
+        });
         let now = OffsetDateTime::from_unix_timestamp(1_735_689_600)
             .unwrap_or(OffsetDateTime::UNIX_EPOCH);
         let auth = AuthService::new(
             repository,
-            token_config,
+            (*token_config).clone(),
             FixedClock::new(now),
             Arc::new(NoopDelay),
             FixedIds::new(Uuid::from_u128(42)),
         );
-        AppState::new(auth, Arc::new(StaticReadiness::ready()))
+        let engine = crate::engine_client::EngineClient::new(
+            "127.0.0.1:7878".parse().unwrap_or_else(|_| {
+                std::net::SocketAddr::from(([127, 0, 0, 1], 7878))
+            }),
+            Duration::from_millis(50),
+        );
+        AppState::new(
+            auth,
+            token_config,
+            Arc::new(StaticReadiness::ready()),
+            sqlx::PgPool::connect_lazy("postgres://localhost/test")
+                .unwrap_or_else(|_| panic!("test pool")),
+            engine,
+            Hub::new(),
+        )
     }
 
     fn json_request(path: &str, request_id: Uuid, body: &str) -> Request<Body> {

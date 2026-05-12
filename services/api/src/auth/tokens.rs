@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -74,11 +74,11 @@ pub struct TokenPair {
     pub expires_in: u64,
 }
 
-/// Token minting error.
+/// Token minting or verification error.
 #[derive(Debug, thiserror::Error)]
 pub enum TokenError {
-    /// JWT encode failed.
-    #[error("jwt encode failed")]
+    /// JWT encode/decode failed.
+    #[error("jwt error")]
     Jwt(#[from] jsonwebtoken::errors::Error),
     /// Token expiry overflowed.
     #[error("token expiry overflow")]
@@ -154,6 +154,22 @@ impl TokenConfig {
             &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
         )
         .map_err(TokenError::from)
+    }
+}
+
+impl TokenConfig {
+    /// Verifies an access JWT and returns its claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError`] when the token is expired, invalid, or signed with a different key.
+    pub fn decode_access_token(&self, token: &str) -> Result<AccessClaims, TokenError> {
+        let key = DecodingKey::from_secret(self.jwt_secret.as_bytes());
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
+        decode::<AccessClaims>(token, &key, &validation)
+            .map(|data| data.claims)
+            .map_err(TokenError::Jwt)
     }
 }
 

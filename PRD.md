@@ -161,9 +161,9 @@ Frontend versions were intentionally refreshed to the latest stable line on **20
 | Component | Language | Version | Pinned via |
 |---|---|---|---|
 | Matching engine | Rust | `1.82.0` | `engine/rust-toolchain.toml` |
-| API gateway | Rust | `1.82.0` | `rust-toolchain.toml` |
-| Settlement worker | Rust | `1.82.0` | `rust-toolchain.toml` |
-| Market-data worker | Rust | `1.82.0` | `rust-toolchain.toml` |
+| API gateway | Rust | `1.95.0` | `services/rust-toolchain.toml` |
+| Settlement worker | Rust | `1.95.0` | `services/rust-toolchain.toml` |
+| Market-data worker | Rust | `1.95.0` | `services/rust-toolchain.toml` |
 | Frontend | TypeScript on Next.js `16.2.6` | Node `24.15.0` LTS | `.nvmrc`, `package.json` |
 | Database | PostgreSQL | `16.4` | `infra/compose/docker-compose.yml` |
 | Cache / pub-sub | Redis | `7.4` | same |

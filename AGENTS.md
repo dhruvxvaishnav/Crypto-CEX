@@ -193,8 +193,11 @@ Booleans must read like sentences: `isReady`, `hasFills`, `canTrade`. **MUST NOT
 
 ### 4.1 Toolchain
 
-- Pinned to `1.82.0` via `engine/rust-toolchain.toml`. Do not change.
-- All commands run from `engine/` unless stated.
+- **Engine** pinned to `1.82.0` via `engine/rust-toolchain.toml`. Do not change.
+- **Services** (API, settlement, market-data) pinned to `1.95.0` via `services/rust-toolchain.toml`. The services lock file requires ≥ 1.85 (edition-2024 transitive deps); 1.82 is incompatible with a cold build.
+- All engine commands run from `engine/` unless stated; service commands run from `services/`.
+
+> **Changelog (2026-05-12):** Services toolchain upgraded 1.82.0 → 1.95.0 to fix pre-existing cold-build breakage caused by `edition = "2024"` transitive deps (`toml_parser 1.1.2`, `getrandom 0.4.2`). Engine toolchain remains 1.82.0.
 
 ### 4.2 Lints
 

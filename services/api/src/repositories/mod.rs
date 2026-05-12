@@ -3,6 +3,9 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+pub mod account;
+pub mod markets;
+pub mod orders;
 pub mod postgres;
 
 #[cfg(test)]
