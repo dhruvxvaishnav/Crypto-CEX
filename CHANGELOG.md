@@ -19,3 +19,4 @@ All notable changes to Aether are recorded here.
 ### API
 
 - Added Day 4B API skeleton and auth slice: Axum service crate, health/readiness routes, request IDs, error envelope, structured logs, engine readiness client, signup/login/refresh auth, argon2id password hashing, JWT access tokens, and refresh-token rotation.
+- Added Day 7 security and rate-limit layer: Redis sliding-window rate limiter per PRD §FR-API-03 (IP + user tiers), HMAC-SHA256 signature verification middleware (PRD §18.4) with replay protection, API key CRUD endpoints (`POST/GET /account/api-keys`, `DELETE /account/api-keys/:id`) with `pgp_sym_encrypt` secret storage, TOTP 2FA full flow (`/auth/2fa/setup|verify|disable`), all PRD §18.3 security response headers, and `GET /openapi.json` via `utoipa`.

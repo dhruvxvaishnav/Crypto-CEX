@@ -36,6 +36,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1.11", features = ["serde", "v4"] }
 validator = { version = "0.20", features = ["derive"] }
+hmac = "0.12"
+totp-rs = { version = "5", features = ["qr"] }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+utoipa = { version = "4", features = ["axum_extras"] }
 
 [workspace.lints.rust]
 non_snake_case = "deny"

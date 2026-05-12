@@ -37,6 +37,13 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("connecting to postgres")?;
 
+    // Connect to Redis for rate limiting and replay protection.
+    let redis_client = redis::Client::open(config.redis_url.as_str())
+        .context("parsing redis URL")?;
+    let redis_conn = redis::aio::ConnectionManager::new(redis_client)
+        .await
+        .context("connecting to redis")?;
+
     // WS hub + engine event channel.
     let (event_tx, event_rx) = mpsc::channel(ENGINE_EVENT_CHANNEL);
     let hub = Hub::new();
@@ -67,14 +74,12 @@ async fn main() -> anyhow::Result<()> {
 
     let readiness = Arc::new(PgEngineReadiness::new(pool.clone(), engine_client.clone()));
 
-    let app = build_router(AppState::new(
-        auth,
-        token_config,
-        readiness,
-        pool,
-        engine_client,
-        hub,
-    ));
+    let state = AppState::new(auth, token_config, readiness, pool, engine_client, hub)
+        .with_redis(redis_conn)
+        .with_pgcrypto_key(config.pgcrypto_key)
+        .with_faucet_enabled(config.faucet_enabled);
+
+    let app = build_router(state);
 
     let listener = TcpListener::bind(config.bind_addr)
         .await

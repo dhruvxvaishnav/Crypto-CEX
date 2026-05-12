@@ -73,6 +73,22 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Added settlement-side engine event bridge that persists engine broadcasts into `engine_events`
 - [x] Full Day 5 smoke test passed locally: API ready, Binance klines persisted, MM quotes appeared in engine, engine events bridged to Postgres, and settlement processed all bridged rows
 
+## Security & Rate Limits (Day 7)
+
+- [x] Added `redis = "0.27"` (with `tokio-comp` + `connection-manager`), `hmac = "0.12"`, `totp-rs = "5"` (with `qr`), and `utoipa = "4"` (with `axum_extras`) to workspace dependencies
+- [x] Extended `Config` with `redis_url`, `pgcrypto_key`, `faucet_enabled`; `AppState` with `redis: Option<ConnectionManager>`, `pgcrypto_key: Arc<str>`, `faucet_enabled`; builder pattern via `with_redis/pgcrypto_key/faucet_enabled`
+- [x] Redis sliding-window rate limiter (`rate_limit.rs`) using Lua script for atomic ZREMRANGEBYSCORE+ZADD; rate limits per PRD §FR-API-03: 10/15min auth, 60/min order write, 600/min read (IP fallback when unauth); rate-limit headers in all responses; fail-open on Redis error
+- [x] Security response headers middleware (`security_headers.rs`): HSTS, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, COOP, CORP, X-Frame-Options per PRD §18.3
+- [x] HMAC-SHA256 signature verification middleware (`extractors/hmac.rs`): reads X-AETHER-KEY/TS/SIGN, verifies ±5s timestamp window, looks up + pgp_sym_decrypts API key secret, constant-time HMAC comparison, Redis replay deduplication; injects `HmacCaller` extension on success
+- [x] `ApiCaller` extractor (`extractors/api_caller.rs`): tries JWT first (if Authorization: Bearer present), falls back to `HmacCaller` extension; used by order handlers for dual JWT/HMAC auth
+- [x] API key CRUD (`handlers/api_keys.rs`): POST creates 32-byte OsRng secret, stores via `pgp_sym_encrypt`, returns secret once; GET lists active keys; DELETE revokes by setting `revoked_at`; full validation (label length, permission allowlist, withdraw disabled)
+- [x] TOTP 2FA full flow (`handlers/totp.rs`): `POST /auth/2fa/setup` generates 20-byte OsRng secret, builds TOTP instance, returns otpauth URI + base64 PNG QR code + base32 secret, stores encrypted; `POST /auth/2fa/verify` checks TOTP code, enables flag, returns 8 random backup codes; `POST /auth/2fa/disable` requires current TOTP code + password, clears flag and secret
+- [x] `GET /openapi.json` endpoint via `utoipa::OpenApi` derive — returns valid OpenAPI 3.1 document with info, tags, servers, and schema stubs; full handler annotation deferred (see clarifications.md)
+- [x] Added repository functions: `find_api_key`, `decrypt_api_key_secret`, `create_api_key`, `revoke_api_key`, `list_api_keys`, `decrypt_totp_secret`, `store_totp_secret`, `enable_totp`, `disable_totp`, `get_user_for_auth`
+- [x] Routes wired: `/auth/2fa/{setup,verify,disable}`, `/account/api-keys`, `/account/api-keys/{id}`, `/openapi.json`; middleware layers: security_headers + request_id on all, hmac_auth + rate_limit on `/api/v1`
+- [x] 5/5 existing router tests pass; 0 clippy errors; all warnings are pedantic/nursery level (warn, not deny)
+- [x] Documented 3 PRD clarifications: API key secret storage (pgcrypto vs. argon2id impossibility), backup codes deferred, OpenAPI annotation deferred
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

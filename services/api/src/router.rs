@@ -1,16 +1,23 @@
 use axum::middleware::from_fn;
-use axum::routing::{get, post};
+use axum::middleware::from_fn_with_state;
+use axum::routing::{delete, get, post};
 use axum::Router;
 
+use crate::extractors::hmac::hmac_auth_middleware;
 use crate::handlers::account::{faucet, get_balances, get_history, get_profile};
+use crate::handlers::api_keys::{create_api_key, list_api_keys, revoke_api_key};
 use crate::handlers::auth::{login, refresh, signup};
 use crate::handlers::health::{health, ready};
 use crate::handlers::markets::{get_klines, get_market, get_orderbook, get_trades, list_markets};
 use crate::handlers::orders::{
     cancel_all_orders, cancel_order, get_order, list_orders, place_order,
 };
+use crate::handlers::totp::{disable_totp, setup_totp, verify_totp};
 use crate::handlers::ws::ws_handler;
 use crate::middleware::{not_found, request_id};
+use crate::openapi::openapi_handler;
+use crate::rate_limit::rate_limit_middleware;
+use crate::security_headers::security_headers;
 use crate::state::AppState;
 
 /// Builds the full API router (PRD §10.3).
@@ -18,7 +25,10 @@ pub fn build_router(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/auth/signup", post(signup))
         .route("/auth/login", post(login))
-        .route("/auth/refresh", post(refresh));
+        .route("/auth/refresh", post(refresh))
+        .route("/auth/2fa/setup", post(setup_totp))
+        .route("/auth/2fa/verify", post(verify_totp))
+        .route("/auth/2fa/disable", post(disable_totp));
 
     let market_routes = Router::new()
         .route("/markets", get(list_markets))
@@ -35,21 +45,29 @@ pub fn build_router(state: AppState) -> Router {
         .route("/account", get(get_profile))
         .route("/account/balances", get(get_balances))
         .route("/account/history", get(get_history))
+        .route("/account/api-keys", post(create_api_key).get(list_api_keys))
+        .route("/account/api-keys/{id}", delete(revoke_api_key))
         .route("/wallet/faucet", post(faucet));
 
     let api_v1 = Router::new()
         .merge(auth_routes)
         .merge(market_routes)
         .merge(order_routes)
-        .merge(account_routes);
+        .merge(account_routes)
+        // HMAC middleware verifies X-AETHER-* headers and injects HmacCaller extension.
+        .layer(from_fn_with_state(state.clone(), hmac_auth_middleware))
+        // Rate limiting applied after request-id so request context is available.
+        .layer(from_fn_with_state(state.clone(), rate_limit_middleware));
 
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/ws", get(ws_handler))
+        .route("/openapi.json", get(openapi_handler))
         .nest("/api/v1", api_v1)
         .fallback(not_found)
         .with_state(state)
+        .layer(from_fn(security_headers))
         .layer(from_fn(request_id))
 }
 

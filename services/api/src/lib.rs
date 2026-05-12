@@ -8,10 +8,13 @@ pub mod errors;
 pub mod extractors;
 pub mod handlers;
 pub mod middleware;
+pub mod openapi;
+pub mod rate_limit;
 pub mod readiness;
 pub mod repositories;
 pub mod router;
 pub mod schemas;
+pub mod security_headers;
 pub mod state;
 pub mod ws;
 

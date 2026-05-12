@@ -26,6 +26,13 @@ pub struct AppState {
     pub engine: EngineClient,
     /// WebSocket subscription hub.
     pub hub: Hub,
+    /// Redis connection manager for rate limiting and replay protection.
+    /// `None` in test environments where Redis is not available.
+    pub redis: Option<redis::aio::ConnectionManager>,
+    /// pgcrypto symmetric key for TOTP and API-key secret encryption.
+    pub pgcrypto_key: Arc<str>,
+    /// Whether the faucet endpoint is enabled (false in production by default).
+    pub faucet_enabled: bool,
 }
 
 impl AppState {
@@ -46,6 +53,30 @@ impl AppState {
             db,
             engine,
             hub,
+            redis: None,
+            pgcrypto_key: Arc::from("dev-insecure-key"),
+            faucet_enabled: true,
         }
+    }
+
+    /// Attaches a live Redis connection manager.
+    #[must_use]
+    pub fn with_redis(mut self, conn: redis::aio::ConnectionManager) -> Self {
+        self.redis = Some(conn);
+        self
+    }
+
+    /// Attaches the pgcrypto encryption key.
+    #[must_use]
+    pub fn with_pgcrypto_key(mut self, key: impl Into<Arc<str>>) -> Self {
+        self.pgcrypto_key = key.into();
+        self
+    }
+
+    /// Sets the faucet enabled flag.
+    #[must_use]
+    pub fn with_faucet_enabled(mut self, enabled: bool) -> Self {
+        self.faucet_enabled = enabled;
+        self
     }
 }

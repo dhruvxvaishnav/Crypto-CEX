@@ -13,6 +13,8 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Postgres connection string.
     pub database_url: String,
+    /// Redis connection string for rate limiting and replay protection.
+    pub redis_url: String,
     /// Engine TCP address.
     pub engine_addr: SocketAddr,
     /// HS256 JWT secret.
@@ -23,6 +25,10 @@ pub struct Config {
     pub mfa_token_ttl: Duration,
     /// Refresh-token TTL.
     pub refresh_token_ttl: Duration,
+    /// pgcrypto symmetric key for TOTP and API-key secret encryption.
+    pub pgcrypto_key: String,
+    /// Whether the faucet endpoint is enabled.
+    pub faucet_enabled: bool,
 }
 
 /// Deployment environment.
@@ -78,15 +84,26 @@ impl Config {
             });
         }
 
+        let redis_url = optional("REDIS_URL")
+            .unwrap_or_else(|| "redis://127.0.0.1:6379".to_owned());
+        let pgcrypto_key = optional("PGCRYPTO_KEY")
+            .unwrap_or_else(|| "dev-insecure-key".to_owned());
+        let faucet_enabled = optional("FAUCET_ENABLED")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(true);
+
         Ok(Self {
             app_env,
             bind_addr: SocketAddr::new(parse_ip("API_HOST", &api_host)?, api_port),
             database_url: required("DATABASE_URL")?,
+            redis_url,
             engine_addr: SocketAddr::new(parse_ip("ENGINE_HOST", &engine_host)?, engine_port),
             jwt_secret,
             access_token_ttl: Duration::from_secs(15 * 60),
             mfa_token_ttl: Duration::from_secs(5 * 60),
             refresh_token_ttl: Duration::from_secs(30 * 24 * 60 * 60),
+            pgcrypto_key,
+            faucet_enabled,
         })
     }
 }
