@@ -4,6 +4,24 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### Frontend (Day 8)
+
+- Added `@tanstack/react-query`, `zustand`, `react-hook-form`, `@radix-ui/*`, `lucide-react`, and `next-themes` dependencies for the frontend shell.
+- Added design tokens in `globals.css` (dark default / light theme), custom scrollbar, and Radix animation keyframes.
+- Added `Providers` client component wrapping `QueryClientProvider` + `ThemeProvider` with `ReactQueryDevtools` in dev.
+- Added `useAuthStore` (zustand, sessionStorage-persisted) and `api-client.ts` with token injection, auto-refresh on 401, and typed `ApiError`.
+- Added `useWebSocket` hook with exponential backoff reconnect (1–16 s), channel subscription management, re-subscription on reconnect, and sequence-number gap detection triggering re-snapshot.
+- Added `Button`, `Input`, `Skeleton`, and `AsyncBoundary` UI primitives (PRD §17.5 a11y-compliant, PRD §17.7 four-state pattern).
+- Added `TopBar` with logo, live `MarketSelector` dropdown (search + price change), 24h stats, nav links, and account dropdown menu.
+- Added auth route handlers (`/api/auth/{login,signup,refresh,logout}`) that proxy to the backend and set `aether_refresh` as httpOnly, Secure, SameSite=Lax cookie.
+- Added auth pages: `login`, `signup`, `2fa`, and `forgot` — all with `react-hook-form` + zod validation, inline server-error mapping, and accessible error regions.
+- Added `proxy.ts` (Next.js 16 route guard) protecting `/trade`, `/portfolio`, `/wallet`, `/account`, `/admin` behind the `aether_refresh` cookie presence check.
+- Added inline `zodResolver` utility (`web/src/lib/zod-resolver.ts`) to avoid Turbopack incompatibility with `@hookform/resolvers@5 → zod/v4/core` subpath export (see `docs/clarifications.md`).
+- Added unit tests: `api-client` (5 cases), `auth.store` (2 cases), `Button` component (5 cases) — 12/12 green.
+- Updated landing page to full marketing shell with hero, feature cards, and market quick-links.
+- Renamed `src/middleware.ts` → `src/proxy.ts` and export to `proxy` per Next.js 16 file convention.
+- `pnpm build` succeeds; `pnpm lint`, `pnpm typecheck`, `pnpm test` all green.
+
 ### Tooling
 
 - Approved the frontend stack refresh to latest stable Next.js, React, Tailwind, Biome, TypeScript, and pnpm versions as of 2026-05-09.

@@ -37,6 +37,29 @@ MFA path are tracked in `docs/v2-ideas.md`.
 
 ---
 
+## 2026-05-13 — @hookform/resolvers v5 requires zod/v4/core subpath (Turbopack incompatible)
+
+**Context:** `web/src/app/(auth)/*.page.tsx`, `web/src/lib/zod-resolver.ts`
+
+**Question:** `@hookform/resolvers@5.x` imports `"zod/v4/core"` (a zod v4 subpath export). Turbopack
+(used by Next.js 16 as the default bundler) cannot resolve subpath exports from the package.json
+`exports` map for this particular package, resulting in a build-time module-not-found error.
+
+**Options:**
+
+A. Downgrade to `@hookform/resolvers@3.x` and import from `zod/v3` compat layer. Works but
+   requires a workaround for zod v4 API differences.
+
+B. Write an inline `zodResolver` utility that calls `schema.safeParse` directly and converts
+   zod v4 issues to react-hook-form `FieldErrors`. Zero external dependency, fully typed.
+
+**Decision:** B — inline `zodResolver` in `web/src/lib/zod-resolver.ts`. This removes
+the `@hookform/resolvers` dependency entirely, has no runtime overhead, and avoids bundler
+incompatibility. The `@hookform/resolvers` package is kept in `package.json` for potential future
+use when Turbopack matures. Tracked as a known Turbopack limitation.
+
+---
+
 ## 2026-05-12 — OpenAPI handler annotation completeness
 
 **Context:** `services/api/src/openapi.rs`

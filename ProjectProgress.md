@@ -89,6 +89,23 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] 5/5 existing router tests pass; 0 clippy errors; all warnings are pedantic/nursery level (warn, not deny)
 - [x] Documented 3 PRD clarifications: API key secret storage (pgcrypto vs. argon2id impossibility), backup codes deferred, OpenAPI annotation deferred
 
+## Frontend Shell (Day 8)
+
+- [x] New deps: `@tanstack/react-query`, `zustand`, `react-hook-form`, `@radix-ui/*`, `lucide-react`, `next-themes`
+- [x] `globals.css`: dark/light design tokens, custom scrollbar, Radix animation keyframes
+- [x] `providers.tsx`: `QueryClientProvider` + `ThemeProvider` + `TokenSync` (rehydrates api-client token from sessionStorage on mount); `ReactQueryDevtools` in dev
+- [x] `api-client.ts`: typed fetch with Bearer injection, auto-refresh on 401, structured `ApiError`
+- [x] `stores/auth.store.ts`: zustand + sessionStorage persist; `setAuth` / `clearAuth`
+- [x] `ws-client.ts`: `useWebSocket` hook — exponential backoff reconnect, channel subscription, sequence-gap re-snapshot trigger
+- [x] UI primitives: `Button` (4 variants × 3 sizes), `Input` (labeled, error, hint, aria-compliant), `Skeleton`, `AsyncBoundary` (PRD §17.7 four-state)
+- [x] `TopBar`: logo, `MarketSelector` (searchable dropdown, price/pct), 24h stats, nav, account dropdown (with logout)
+- [x] Auth route handlers: `/api/auth/{login,signup,refresh,logout}` proxy backend → set httpOnly `aether_refresh` cookie
+- [x] Auth pages: login, signup, 2fa (Suspense-wrapped), forgot (mocked send)
+- [x] `proxy.ts` (Next.js 16): guards `/trade`, `/portfolio`, `/wallet`, `/account`, `/admin` via `aether_refresh` cookie
+- [x] Updated landing page with hero, feature cards, quick-trade links
+- [x] 12/12 unit tests green; `pnpm lint`, `pnpm typecheck`, `pnpm build` all pass
+- [x] Clarification documented: `@hookform/resolvers@5` / `zod/v4/core` Turbopack incompatibility → inline `zodResolver`
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.
