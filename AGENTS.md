@@ -1,9 +1,5 @@
 # AGENTS.md — Universal Rulebook for AI Coding Agents
 
-**Project:** Aether (Crypto CEX)
-**Applies to:** Claude Code, OpenAI Codex / Codex CLI, Google Gemini CLI, Cursor, Aider, Continue, and any other AI agent operating on this repository.
-**Authority:** This document binds every AI agent that writes code in this repo. Violations of MUST rules cause CI to fail and require revert. The PRD (`PRD.md`) defines **what** to build; this file defines **how** to build it.
-
 > Reading rule: "**MUST**", "**MUST NOT**", "**SHALL**" = hard contracts (RFC 2119). "**SHOULD**" = strongly preferred. "**MAY**" = permitted.
 
 ---
