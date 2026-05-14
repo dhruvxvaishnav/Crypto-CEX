@@ -25,6 +25,7 @@ All notable changes to Aether are recorded here.
 - Added `TopBar` with logo, live `MarketSelector` dropdown (search + price change), 24h stats, nav links, and account dropdown menu.
 - Added auth route handlers (`/api/auth/{login,signup,refresh,logout}`) that proxy to the backend and set `aether_refresh` as httpOnly, Secure, SameSite=Lax cookie.
 - Added auth pages: `login`, `signup`, `2fa`, and `forgot` — all with `react-hook-form` + zod validation, inline server-error mapping, and accessible error regions.
+- Declared `zod` as a direct `@aether/web` dependency so clean CI installs can typecheck auth validation imports.
 - Added `proxy.ts` (Next.js 16 route guard) protecting `/trade`, `/portfolio`, `/wallet`, `/account`, `/admin` behind the `aether_refresh` cookie presence check.
 - Added inline `zodResolver` utility (`web/src/lib/zod-resolver.ts`) to avoid Turbopack incompatibility with `@hookform/resolvers@5 → zod/v4/core` subpath export (see `docs/clarifications.md`).
 - Added unit tests: `api-client` (5 cases), `auth.store` (2 cases), `Button` component (5 cases) — 12/12 green.

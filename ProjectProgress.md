@@ -91,7 +91,7 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 
 ## Frontend Shell (Day 8)
 
-- [x] New deps: `@tanstack/react-query`, `zustand`, `react-hook-form`, `@radix-ui/*`, `lucide-react`, `next-themes`
+- [x] New deps: `@tanstack/react-query`, `zustand`, `react-hook-form`, `zod`, `@radix-ui/*`, `lucide-react`, `next-themes`
 - [x] `globals.css`: dark/light design tokens, custom scrollbar, Radix animation keyframes
 - [x] `providers.tsx`: `QueryClientProvider` + `ThemeProvider` + `TokenSync` (rehydrates api-client token from sessionStorage on mount); `ReactQueryDevtools` in dev
 - [x] `api-client.ts`: typed fetch with Bearer injection, auto-refresh on 401, structured `ApiError`
