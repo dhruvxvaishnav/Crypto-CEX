@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -11,19 +11,26 @@ const BACKOFF = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
 export type WsStatus = "connecting" | "connected" | "disconnected";
 
 interface SubscribeMsg {
-  type: "subscribe";
-  channel: string;
+  id: string;
+  method: "subscribe";
+  params: {
+    channels: string[];
+    afterSeq?: number;
+  };
 }
 
 interface UnsubscribeMsg {
-  type: "unsubscribe";
-  channel: string;
+  id: string;
+  method: "unsubscribe";
+  params: {
+    channels: string[];
+  };
 }
 
 type OutboundMsg = SubscribeMsg | UnsubscribeMsg;
 type ChannelSeq = Map<string, number>;
 
-interface UseWebSocketReturn {
+export interface UseWebSocketReturn {
   status: WsStatus;
   subscribe: (channel: string, onMessage: (payload: unknown) => void) => () => void;
 }
@@ -38,12 +45,34 @@ export function useWebSocket(): UseWebSocketReturn {
   const handlersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
   const seqRef = useRef<ChannelSeq>(new Map());
   const channelsRef = useRef<Set<string>>(new Set());
+  const requestIdRef = useRef(0);
+
+  const nextRequestId = useCallback(() => {
+    requestIdRef.current += 1;
+    return `ws-${requestIdRef.current}`;
+  }, []);
 
   const send = useCallback((msg: OutboundMsg) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
     }
   }, []);
+
+  const sendSubscribe = useCallback(
+    (channel: string, afterSeq?: number) => {
+      const params: SubscribeMsg["params"] = { channels: [channel] };
+      if (afterSeq !== undefined) params.afterSeq = afterSeq;
+      send({ id: nextRequestId(), method: "subscribe", params });
+    },
+    [nextRequestId, send],
+  );
+
+  const sendUnsubscribe = useCallback(
+    (channel: string) => {
+      send({ id: nextRequestId(), method: "unsubscribe", params: { channels: [channel] } });
+    },
+    [nextRequestId, send],
+  );
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -56,9 +85,11 @@ export function useWebSocket(): UseWebSocketReturn {
     ws.onopen = () => {
       setStatus("connected");
       retryRef.current = 0;
-      // Re-subscribe all channels after reconnect.
       for (const channel of channelsRef.current) {
-        ws.send(JSON.stringify({ type: "subscribe", channel } satisfies SubscribeMsg));
+        const afterSeq = seqRef.current.get(channel);
+        const params: SubscribeMsg["params"] = { channels: [channel] };
+        if (afterSeq !== undefined) params.afterSeq = afterSeq;
+        ws.send(JSON.stringify({ id: nextRequestId(), method: "subscribe", params }));
       }
     };
 
@@ -72,30 +103,40 @@ export function useWebSocket(): UseWebSocketReturn {
       if (typeof parsed !== "object" || parsed === null) return;
       const msg = parsed as Record<string, unknown>;
 
-      // Heartbeat — no dispatch needed.
-      if (msg.type === "heartbeat") return;
-
       const channel = typeof msg.channel === "string" ? msg.channel : null;
       if (!channel) return;
+      const dispatchChannel = channel.endsWith(".snapshot")
+        ? `${channel.slice(0, -".snapshot".length)}.diff`
+        : channel;
 
-      // Gap detection: if seq is non-zero and out of order, re-subscribe to force re-snapshot.
       const seq = typeof msg.seq === "number" ? msg.seq : null;
       if (seq !== null) {
-        const lastSeq = seqRef.current.get(channel);
+        const lastSeq = seqRef.current.get(dispatchChannel);
         if (lastSeq !== undefined && seq !== lastSeq + 1) {
-          // Gap detected — drop cached seq, re-subscribe to trigger snapshot.
-          seqRef.current.delete(channel);
-          ws.send(JSON.stringify({ type: "unsubscribe", channel } satisfies UnsubscribeMsg));
-          ws.send(JSON.stringify({ type: "subscribe", channel } satisfies SubscribeMsg));
+          seqRef.current.delete(dispatchChannel);
+          ws.send(
+            JSON.stringify({
+              id: nextRequestId(),
+              method: "unsubscribe",
+              params: { channels: [dispatchChannel] },
+            } satisfies UnsubscribeMsg),
+          );
+          ws.send(
+            JSON.stringify({
+              id: nextRequestId(),
+              method: "subscribe",
+              params: { channels: [dispatchChannel], afterSeq: lastSeq },
+            } satisfies SubscribeMsg),
+          );
           return;
         }
-        seqRef.current.set(channel, seq);
+        seqRef.current.set(dispatchChannel, seq);
       }
 
-      const handlers = handlersRef.current.get(channel);
+      const handlers = handlersRef.current.get(dispatchChannel);
       if (!handlers) return;
       for (const handler of handlers) {
-        handler(msg.payload ?? msg);
+        handler(msg.data ?? msg.payload ?? msg);
       }
     };
 
@@ -110,9 +151,8 @@ export function useWebSocket(): UseWebSocketReturn {
     ws.onerror = () => {
       ws.close();
     };
-  }, [accessToken]);
+  }, [accessToken, nextRequestId]);
 
-  // Connect on mount; reconnect when token changes.
   useEffect(() => {
     connect();
     return () => {
@@ -127,9 +167,8 @@ export function useWebSocket(): UseWebSocketReturn {
       if (!handlersRef.current.has(channel)) {
         handlersRef.current.set(channel, new Set());
         channelsRef.current.add(channel);
-        send({ type: "subscribe", channel });
+        sendSubscribe(channel);
       }
-      // Entry was just created above if missing — guaranteed to exist.
       handlersRef.current.get(channel)?.add(onMessage);
 
       return () => {
@@ -140,12 +179,12 @@ export function useWebSocket(): UseWebSocketReturn {
           handlersRef.current.delete(channel);
           channelsRef.current.delete(channel);
           seqRef.current.delete(channel);
-          send({ type: "unsubscribe", channel });
+          sendUnsubscribe(channel);
         }
       };
     },
-    [send],
+    [sendSubscribe, sendUnsubscribe],
   );
 
-  return { status, subscribe };
+  return useMemo(() => ({ status, subscribe }), [status, subscribe]);
 }

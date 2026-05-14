@@ -4,6 +4,16 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### Frontend (Day 9)
+
+- Added the `/trade/[symbol]` trading screen with shared live WebSocket state, top-bar market context, order book, chart, and recent-trades panels.
+- Added `lightweight-charts@4.2` for PRD Day 9 candlestick rendering and wired kline history plus live trade-driven candle updates.
+- Added order-book snapshot loading, WebSocket diff subscription, deterministic delta merge, cumulative totals, and virtualized bid/ask rows.
+- Added recent-trades history loading with live `trade.<symbol>` updates, dedupe, and UTC timestamp formatting.
+- Updated the frontend WebSocket client to match the Rust hub protocol (`method`, `params.channels`, `afterSeq`) and route `book.<symbol>.snapshot` frames into diff subscribers.
+- Added typed market-data helpers and order-book model tests covering sort/merge/stale-delta behavior.
+- Moved Next.js `themeColor` config from metadata to `viewport` to keep production builds warning-free on Next.js 16.
+
 ### Frontend (Day 8)
 
 - Added `@tanstack/react-query`, `zustand`, `react-hook-form`, `@radix-ui/*`, `lucide-react`, and `next-themes` dependencies for the frontend shell.

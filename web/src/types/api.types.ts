@@ -12,39 +12,67 @@ export interface PaginatedResponse<T> {
   nextCursor: string | null;
 }
 
+export interface ApiDataResponse<T> {
+  data: T;
+}
+
 export interface Market {
+  id: string;
   symbol: string;
   baseAsset: string;
   quoteAsset: string;
-  status: "active" | "halted";
+  status: "active" | "halted" | "trading";
   tickSize: string;
   lotSize: string;
   minNotional: string;
   lastPrice: string | null;
-  priceChange24h: string | null;
-  priceChangePct24h: string | null;
   volume24h: string | null;
+  high24h: string | null;
+  low24h: string | null;
+  priceChangePct: string | null;
+  makerFeeBps: string;
+  takerFeeBps: string;
 }
 
-export interface OrderBookLevel {
-  price: string;
-  quantity: string;
+export interface MarketTicker {
+  symbol: string;
+  lastPrice: string | null;
+  open24h: string | null;
+  high24h: string | null;
+  low24h: string | null;
+  volume24h: string | null;
+  priceChangePct: string | null;
 }
+
+export type PriceLevelTuple = readonly [string, string];
 
 export interface OrderBookSnapshot {
-  symbol: string;
   seq: number;
-  bids: OrderBookLevel[];
-  asks: OrderBookLevel[];
+  bids: PriceLevelTuple[];
+  asks: PriceLevelTuple[];
+}
+
+export interface OrderBookDelta {
+  seq: number;
+  bids: PriceLevelTuple[];
+  asks: PriceLevelTuple[];
 }
 
 export interface Trade {
   id: string;
-  symbol: string;
   price: string;
-  quantity: string;
+  qty: string;
   side: "buy" | "sell";
-  executedAt: string;
+  ts: string;
+}
+
+export interface Kline {
+  ts: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
 }
 
 export interface Order {

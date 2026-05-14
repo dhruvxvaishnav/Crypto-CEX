@@ -106,6 +106,20 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] 12/12 unit tests green; `pnpm lint`, `pnpm typecheck`, `pnpm build` all pass
 - [x] Clarification documented: `@hookform/resolvers@5` / `zod/v4/core` Turbopack incompatibility → inline `zodResolver`
 
+## Trading Screen Part 1 (Day 9)
+
+- [x] Added `lightweight-charts@4.2` per PRD §5.2/Day 9 for production-grade candlestick rendering
+- [x] Added `/trade/[symbol]` App Router page backed by a client `TradingScreen`
+- [x] Added REST market-data helpers for `/markets`, `/markets/:symbol/orderbook`, `/trades`, and `/klines`
+- [x] Fixed frontend WebSocket client protocol to match the Rust hub (`method`, `params.channels`, `afterSeq`) and dispatch `book.<symbol>.snapshot` into the subscribed diff stream
+- [x] Order book component loads an engine snapshot, subscribes to `book.<symbol>.diff`, merges deltas deterministically, detects stale diffs, computes totals, and renders virtualized bid/ask rows
+- [x] Recent trades component loads REST history, subscribes to `trade.<symbol>`, deduplicates live fills, and displays UTC timestamps
+- [x] Chart component loads 1m klines, renders candlesticks via `lightweight-charts`, and updates the active candle from live trade events
+- [x] Trading screen reuses the Day 8 `TopBar`/market selector and shares a single WebSocket connection across Day 9 panels
+- [x] Added focused unit coverage for order-book sorting, delta merge, stale-delta rejection, and decimal-string comparison
+- [x] Moved `themeColor` from metadata to `viewport` for a clean Next.js 16 production build
+- [x] `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build` all pass
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

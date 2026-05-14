@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { Providers } from "./providers";
@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   },
   description:
     "Production-architecture crypto exchange. Spot trading with sub-millisecond matching engine.",
+};
+
+export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#09090b" },
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },
