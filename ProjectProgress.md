@@ -120,6 +120,16 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Moved `themeColor` from metadata to `viewport` for a clean Next.js 16 production build
 - [x] `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build` all pass
 
+## Trading Screen Part 2 (Day 10)
+
+- [x] Added typed trading API helpers for order placement, order listing, cancel, and cancel-all
+- [x] Added order form covering all PRD §FR-TRADE-05 order types: limit, market, IOC, FOK, post-only, stop-limit, stop-market, and OCO
+- [x] Added client-side order validation for required price, stop price, base quantity, quote quantity, and iceberg display quantity
+- [x] Added authenticated activity tabs for open orders, closed order history, and live private fills
+- [x] Added open-order cancel actions with query invalidation after mutations
+- [x] Added trading hotkeys for buy/sell side selection, order form focus, and submit
+- [x] Added focused unit coverage for order payload shaping and hotkey filtering
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

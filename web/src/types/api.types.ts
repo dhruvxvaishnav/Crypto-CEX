@@ -16,6 +16,11 @@ export interface ApiDataResponse<T> {
   data: T;
 }
 
+export interface ApiListResponse<T> {
+  data: T[];
+  nextCursor: string | null;
+}
+
 export interface Market {
   id: string;
   symbol: string;
@@ -75,17 +80,73 @@ export interface Kline {
   volume: string;
 }
 
+export type OrderSide = "buy" | "sell";
+
+export type OrderType =
+  | "limit"
+  | "market"
+  | "ioc"
+  | "fok"
+  | "post_only"
+  | "stop_limit"
+  | "stop_market"
+  | "oco";
+
+export type OrderStatus = "pending" | "new" | "partial" | "filled" | "canceled" | "rejected";
+
+export interface OrderFill {
+  tradeId: string;
+  price: string;
+  quantity: string;
+  side: OrderSide;
+  ts: string;
+}
+
 export interface Order {
   id: string;
   clientOrderId: string | null;
-  symbol: string;
-  side: "buy" | "sell";
-  type: string;
+  market: string;
+  side: OrderSide;
+  type: OrderType;
+  status: OrderStatus;
   price: string | null;
+  stopPrice: string | null;
   quantity: string | null;
-  filledQty: string;
-  status: string;
+  quoteQuantity: string | null;
+  displayQuantity: string | null;
+  filledQuantity: string;
+  avgFillPrice: string | null;
+  fills: OrderFill[];
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlaceOrderInput {
+  clientOrderId: string;
+  market: string;
+  side: OrderSide;
+  type: OrderType;
+  price?: string;
+  stopPrice?: string;
+  quantity?: string;
+  quoteQuantity?: string;
+  displayQuantity?: string;
+}
+
+export interface CancelAllOrdersResponse {
+  canceledOrderIds: string[];
+  count: number;
+}
+
+export interface UserFill {
+  tradeId: string;
+  symbol: string;
+  takerOrderId: string;
+  makerOrderId: string;
+  price: string;
+  qty: string;
+  takerSide: OrderSide;
+  ts: string;
 }
 
 export interface Balance {
