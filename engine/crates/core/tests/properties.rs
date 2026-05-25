@@ -1,3 +1,7 @@
+// Tests intentionally use direct event indexing and panic-style assertions for
+// concise invariant failures; AGENTS.md §4.2 exempts test modules from these lints.
+#![allow(clippy::indexing_slicing, clippy::panic)]
+
 use cex_core::book::{EngineEvent, OrderBook};
 use cex_core::types::{Order, OrderType, Side, StpMode};
 use proptest::prelude::*;

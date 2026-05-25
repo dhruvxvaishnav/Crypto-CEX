@@ -30,14 +30,14 @@ pub struct RateLimitOutcome {
 /// Lua script: atomic sliding-window counter.
 ///
 /// KEYS[1] = rate-limit key
-/// ARGV[1] = now_ms (current epoch millis)
-/// ARGV[2] = window_ms (window size in millis)
+/// ARGV[1] = `now_ms` (current epoch millis)
+/// ARGV[2] = `window_ms` (window size in millis)
 /// ARGV[3] = limit (max requests in window)
 /// ARGV[4] = member (unique request identifier)
 ///
 /// Returns `[count_before_add, was_added]`:
-///   was_added = 1 → request allowed and counted
-///   was_added = 0 → limit exceeded
+///   `was_added` = 1 → request allowed and counted
+///   `was_added` = 0 → limit exceeded
 const SLIDING_WINDOW_SCRIPT: &str = r"
 local key     = KEYS[1]
 local now     = tonumber(ARGV[1])
@@ -111,8 +111,7 @@ pub async fn check_rate_limit(
 
     let allowed = was_added == 1;
     let remaining = if allowed {
-        u32::try_from(i64::from(limit) - count)
-            .unwrap_or(0)
+        u32::try_from(i64::from(limit) - count).unwrap_or(0)
     } else {
         0
     };
@@ -202,16 +201,36 @@ fn classify_request(
     // Order write endpoints.
     if path.starts_with("/api/v1/orders") {
         let (limit, key) = user_key.map_or_else(
-            || (30_u32, format!("rl:orders:ip:{ip}:{}", window_bucket(now_ms, 60_000))),
-            |uid| (60_u32, format!("rl:orders:user:{uid}:{}", window_bucket(now_ms, 60_000))),
+            || {
+                (
+                    30_u32,
+                    format!("rl:orders:ip:{ip}:{}", window_bucket(now_ms, 60_000)),
+                )
+            },
+            |uid| {
+                (
+                    60_u32,
+                    format!("rl:orders:user:{uid}:{}", window_bucket(now_ms, 60_000)),
+                )
+            },
         );
         return (limit, 60_000, key);
     }
 
     // Read endpoints.
     let (limit, key) = user_key.map_or_else(
-        || (30_u32, format!("rl:read:ip:{ip}:{}", window_bucket(now_ms, 60_000))),
-        |uid| (600_u32, format!("rl:read:user:{uid}:{}", window_bucket(now_ms, 60_000))),
+        || {
+            (
+                30_u32,
+                format!("rl:read:ip:{ip}:{}", window_bucket(now_ms, 60_000)),
+            )
+        },
+        |uid| {
+            (
+                600_u32,
+                format!("rl:read:user:{uid}:{}", window_bucket(now_ms, 60_000)),
+            )
+        },
     );
     (limit, 60_000, key)
 }
@@ -255,8 +274,5 @@ const fn window_bucket(now_ms: i64, window_ms: i64) -> i64 {
 fn chrono_now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| {
-            i64::try_from(d.as_millis()).unwrap_or(i64::MAX)
-        })
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
-

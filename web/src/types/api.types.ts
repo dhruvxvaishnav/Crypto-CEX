@@ -151,7 +151,8 @@ export interface UserFill {
 
 export interface Balance {
   asset: string;
-  free: string;
+  assetName: string;
+  available: string;
   locked: string;
   total: string;
 }
@@ -159,6 +160,63 @@ export interface Balance {
 export interface UserProfile {
   id: string;
   email: string;
+  status: "active" | "frozen" | "closed";
+  kycLevel: number;
+  emailVerified: boolean;
   totpEnabled: boolean;
+  isAdmin: boolean;
   createdAt: string;
+}
+
+export interface LedgerEntry {
+  id: number;
+  asset: string;
+  kind: "deposit" | "withdrawal" | "trade" | "fee" | "lock" | "unlock" | "adjustment";
+  amount: string;
+  availableAfter: string;
+  lockedAfter: string;
+  referenceType: string;
+  referenceId: string | null;
+  ts: string;
+}
+
+export interface FaucetInput {
+  asset: string;
+  amount: string;
+}
+
+export interface FaucetResponse {
+  depositId: string;
+  asset: string;
+  amount: string;
+  availableAfter: string;
+}
+
+export interface TotpSetupResponse {
+  secret: string;
+  otpAuthUri: string;
+  qr: string;
+}
+
+export interface TotpVerifyResponse {
+  enabled: boolean;
+  backupCodes: string[];
+}
+
+export interface CreateApiKeyInput {
+  label: string;
+  permissions: ApiKeyPermission[];
+}
+
+export type ApiKeyPermission = "read" | "trade";
+
+export interface ApiKey {
+  keyId: string;
+  label: string;
+  permissions: ApiKeyPermission[];
+  createdAt: string;
+}
+
+export interface CreatedApiKey extends ApiKey {
+  secret: string;
 }

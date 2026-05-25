@@ -461,7 +461,7 @@ mod tests {
     use crate::{EngineOrder, EngineOrderType, EngineRequest, OrderSide, PlaceRequest, StpMode};
 
     #[test]
-    fn serialises_prd_request_shape() {
+    fn serialises_prd_request_shape() -> Result<(), serde_json::Error> {
         let request_id = uuid::Uuid::nil();
         let order = EngineOrder {
             id: uuid::Uuid::nil(),
@@ -478,12 +478,22 @@ mod tests {
         };
         let request = EngineRequest::Place(PlaceRequest { request_id, order });
 
-        let value = serde_json::to_value(request).expect("request serialises");
+        let value = serde_json::to_value(request)?;
 
-        assert_eq!(value["kind"], json!("place"));
-        assert_eq!(value["requestId"], json!(request_id.to_string()));
-        assert_eq!(value["order"]["orderType"], json!("limit"));
-        assert_eq!(value["order"]["price"], json!("100"));
-        assert_eq!(value["order"]["side"], json!("buy"));
+        assert_eq!(value.get("kind"), Some(&json!("place")));
+        assert_eq!(value.get("requestId"), Some(&json!(request_id.to_string())));
+        assert_eq!(
+            value.get("order").and_then(|order| order.get("orderType")),
+            Some(&json!("limit"))
+        );
+        assert_eq!(
+            value.get("order").and_then(|order| order.get("price")),
+            Some(&json!("100"))
+        );
+        assert_eq!(
+            value.get("order").and_then(|order| order.get("side")),
+            Some(&json!("buy"))
+        );
+        Ok(())
     }
 }

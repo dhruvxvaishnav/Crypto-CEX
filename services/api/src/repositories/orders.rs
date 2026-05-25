@@ -44,7 +44,7 @@ pub struct InsertOrder {
 
 /// Inserts a new order row and returns it with the market symbol.
 ///
-/// Uses a CTE so we can JOIN markets in the SELECT — PostgreSQL RETURNING
+/// Uses a CTE so we can JOIN markets in the SELECT — `PostgreSQL` RETURNING
 /// cannot reference other tables directly.
 ///
 /// # Errors
@@ -247,19 +247,13 @@ pub async fn list(
 /// # Errors
 ///
 /// Returns `sqlx::Error` on DB failure.
-pub async fn update_status(
-    pool: &PgPool,
-    order_id: Uuid,
-    status: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE orders SET status = $1::order_status, updated_at = now() WHERE id = $2",
-    )
-    .bind(status)
-    .bind(order_id)
-    .execute(pool)
-    .await
-    .map(|_| ())
+pub async fn update_status(pool: &PgPool, order_id: Uuid, status: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE orders SET status = $1::order_status, updated_at = now() WHERE id = $2")
+        .bind(status)
+        .bind(order_id)
+        .execute(pool)
+        .await
+        .map(|_| ())
 }
 
 /// Atomically checks and locks `amount` of `asset_id` for `user_id`.

@@ -103,8 +103,12 @@ pub async fn place_order(
     payload: Result<Json<PlaceOrderInput>, axum::extract::rejection::JsonRejection>,
 ) -> Result<impl IntoResponse, ApiError> {
     let Json(input) = payload.map_err(|_| {
-        ApiError::new(StatusCode::BAD_REQUEST, ErrorCode::Internal, "Invalid JSON body")
-            .with_request_id(ctx.request_id)
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            ErrorCode::Internal,
+            "Invalid JSON body",
+        )
+        .with_request_id(ctx.request_id)
     })?;
 
     let symbol = input.market.to_uppercase();
@@ -120,12 +124,22 @@ pub async fn place_order(
     }
 
     // ── AC3: Validate inputs ──────────────────────────────────────────────────
-    let (engine_side, engine_type) = parse_side_type(&input.side, &input.order_type, ctx.request_id)?;
+    let (engine_side, engine_type) =
+        parse_side_type(&input.side, &input.order_type, ctx.request_id)?;
     let price = parse_optional_decimal(input.price.as_deref(), "price", ctx.request_id)?;
-    let stop_price = parse_optional_decimal(input.stop_price.as_deref(), "stopPrice", ctx.request_id)?;
+    let stop_price =
+        parse_optional_decimal(input.stop_price.as_deref(), "stopPrice", ctx.request_id)?;
     let quantity = parse_optional_decimal(input.quantity.as_deref(), "quantity", ctx.request_id)?;
-    let quote_quantity = parse_optional_decimal(input.quote_quantity.as_deref(), "quoteQuantity", ctx.request_id)?;
-    let display_quantity = parse_optional_decimal(input.display_quantity.as_deref(), "displayQuantity", ctx.request_id)?;
+    let quote_quantity = parse_optional_decimal(
+        input.quote_quantity.as_deref(),
+        "quoteQuantity",
+        ctx.request_id,
+    )?;
+    let display_quantity = parse_optional_decimal(
+        input.display_quantity.as_deref(),
+        "displayQuantity",
+        ctx.request_id,
+    )?;
 
     // Quantity: limit/ioc/fok/post_only need `quantity`; market buy needs `quoteQuantity`.
     let effective_qty = match engine_type {
@@ -167,7 +181,14 @@ pub async fn place_order(
     }
 
     // Limit price validation.
-    if matches!(engine_type, EngineOrderType::Limit | EngineOrderType::PostOnly | EngineOrderType::Ioc | EngineOrderType::Fok) && price.is_none() {
+    if matches!(
+        engine_type,
+        EngineOrderType::Limit
+            | EngineOrderType::PostOnly
+            | EngineOrderType::Ioc
+            | EngineOrderType::Fok
+    ) && price.is_none()
+    {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             ErrorCode::Internal,
@@ -182,15 +203,21 @@ pub async fn place_order(
             .await
             .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?
             .ok_or_else(|| {
-                ApiError::new(StatusCode::NOT_FOUND, ErrorCode::MarketUnknown, "Market not found")
-                    .with_request_id(ctx.request_id)
+                ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    ErrorCode::MarketUnknown,
+                    "Market not found",
+                )
+                .with_request_id(ctx.request_id)
             })?;
 
     if market_status == "halted" || market_status == "delisted" {
-        return Err(
-            ApiError::new(StatusCode::CONFLICT, ErrorCode::MarketHalted, "Market is halted")
-                .with_request_id(ctx.request_id),
-        );
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            ErrorCode::MarketHalted,
+            "Market is halted",
+        )
+        .with_request_id(ctx.request_id));
     }
 
     // ── AC3: Balance lock ─────────────────────────────────────────────────────
@@ -267,8 +294,7 @@ pub async fn place_order(
             let pool = state.db.clone();
             let user_id = caller.user_id;
             tokio::spawn(async move {
-                if let Err(e) = order_repo::unlock_balance(&pool, user_id, asset_id, amount).await
-                {
+                if let Err(e) = order_repo::unlock_balance(&pool, user_id, asset_id, amount).await {
                     tracing::error!(err = %e, "orders.place.unlock_failed_after_engine_error");
                 }
             });
@@ -323,8 +349,12 @@ pub async fn get_order(
         .await
         .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?
         .ok_or_else(|| {
-            ApiError::new(StatusCode::NOT_FOUND, ErrorCode::OrderNotFound, "Order not found")
-                .with_request_id(ctx.request_id)
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                ErrorCode::OrderNotFound,
+                "Order not found",
+            )
+            .with_request_id(ctx.request_id)
         })?;
 
     Ok(Json(order_to_response(row, vec![])))
@@ -393,8 +423,12 @@ pub async fn cancel_order(
         .await
         .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?
         .ok_or_else(|| {
-            ApiError::new(StatusCode::NOT_FOUND, ErrorCode::OrderNotFound, "Order not found")
-                .with_request_id(ctx.request_id)
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                ErrorCode::OrderNotFound,
+                "Order not found",
+            )
+            .with_request_id(ctx.request_id)
         })?;
 
     // Idempotent: already final orders return as-is.
@@ -517,17 +551,16 @@ fn parse_optional_decimal(
     field: &str,
     request_id: Uuid,
 ) -> Result<Option<Decimal>, ApiError> {
-    match raw {
-        None => Ok(None),
-        Some(s) => s.parse::<Decimal>().map(Some).map_err(|_| {
+    raw.map_or(Ok(None), |s| {
+        s.parse::<Decimal>().map(Some).map_err(|_| {
             ApiError::new(
                 StatusCode::BAD_REQUEST,
                 ErrorCode::Internal,
                 format!("Invalid decimal for {field}"),
             )
             .with_request_id(request_id)
-        }),
-    }
+        })
+    })
 }
 
 /// Determines which asset to lock and by how much before forwarding to engine.
@@ -547,16 +580,13 @@ fn balance_lock_params(
         // Stop orders: no lock until trigger.
         (_, EngineOrderType::StopLimit | EngineOrderType::StopMarket) => (None, None),
         // BUY limit: lock quote = price × qty
-        (OrderSide::Buy, _) => {
-            if let Some(p) = price {
+        (OrderSide::Buy, _) => price.map_or_else(
+            || quote_quantity.map_or((None, None), |qq| (Some(quote_asset_id), Some(qq))),
+            |p| {
                 let amount = p * quantity;
                 (Some(quote_asset_id), Some(amount))
-            } else if let Some(qq) = quote_quantity {
-                (Some(quote_asset_id), Some(qq))
-            } else {
-                (None, None)
-            }
-        }
+            },
+        ),
         // SELL: lock base qty.
         (OrderSide::Sell, _) => (Some(base_asset_id), Some(quantity)),
     }
@@ -564,7 +594,7 @@ fn balance_lock_params(
 
 fn order_type_str(t: EngineOrderType) -> String {
     match t {
-        EngineOrderType::Limit => "limit",
+        EngineOrderType::Limit | EngineOrderType::Iceberg => "limit",
         EngineOrderType::Market => "market",
         EngineOrderType::Ioc => "ioc",
         EngineOrderType::Fok => "fok",
@@ -572,7 +602,6 @@ fn order_type_str(t: EngineOrderType) -> String {
         EngineOrderType::StopLimit => "stop_limit",
         EngineOrderType::StopMarket => "stop_market",
         EngineOrderType::Oco => "oco",
-        EngineOrderType::Iceberg => "limit",
     }
     .to_owned()
 }

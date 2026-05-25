@@ -16,12 +16,16 @@ async fn main() -> anyhow::Result<()> {
     let run = server.run(cancellation.clone());
     tokio::pin!(run);
 
-    tokio::select! {
-        result = &mut run => result.context("running engine server")?,
-        signal = tokio::signal::ctrl_c() => {
-            signal.context("waiting for ctrl-c")?;
-            cancellation.cancel();
-            run.await.context("draining engine server after shutdown")?;
+    // `tokio::select!` expands helper items that trip `redundant_pub_crate`.
+    #[allow(clippy::redundant_pub_crate)]
+    {
+        tokio::select! {
+            result = &mut run => result.context("running engine server")?,
+            signal = tokio::signal::ctrl_c() => {
+                signal.context("waiting for ctrl-c")?;
+                cancellation.cancel();
+                run.await.context("draining engine server after shutdown")?;
+            }
         }
     }
 

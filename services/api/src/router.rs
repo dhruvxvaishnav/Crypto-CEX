@@ -38,7 +38,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/markets/{symbol}/klines", get(get_klines));
 
     let order_routes = Router::new()
-        .route("/orders", post(place_order).delete(cancel_all_orders).get(list_orders))
+        .route(
+            "/orders",
+            post(place_order).delete(cancel_all_orders).get(list_orders),
+        )
         .route("/orders/{id}", get(get_order).delete(cancel_order));
 
     let account_routes = Router::new()
@@ -79,6 +82,7 @@ mod tests {
     use axum::body::{to_bytes, Body};
     use axum::http::{header, Request, StatusCode};
     use serde_json::Value;
+    use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
     use time::OffsetDateTime;
     use tower::ServiceExt;
     use uuid::Uuid;
@@ -178,10 +182,10 @@ mod tests {
         let repository = MemoryAuthRepository::shared();
         let jwt_secret = "test-secret-that-is-long-enough-for-hs256".to_owned();
         let token_config = Arc::new(TokenConfig {
-            jwt_secret: jwt_secret.clone(),
-            access_token_ttl: Duration::from_secs(900),
-            mfa_token_ttl: Duration::from_secs(300),
-            refresh_token_ttl: Duration::from_secs(30 * 24 * 60 * 60),
+            jwt_secret,
+            access_token_ttl: Duration::from_mins(15),
+            mfa_token_ttl: Duration::from_mins(5),
+            refresh_token_ttl: Duration::from_hours(720),
         });
         let now = OffsetDateTime::from_unix_timestamp(1_735_689_600)
             .unwrap_or(OffsetDateTime::UNIX_EPOCH);
@@ -193,17 +197,16 @@ mod tests {
             FixedIds::new(Uuid::from_u128(42)),
         );
         let engine = crate::engine_client::EngineClient::new(
-            "127.0.0.1:7878".parse().unwrap_or_else(|_| {
-                std::net::SocketAddr::from(([127, 0, 0, 1], 7878))
-            }),
+            "127.0.0.1:7878"
+                .parse()
+                .unwrap_or_else(|_| std::net::SocketAddr::from(([127, 0, 0, 1], 7878))),
             Duration::from_millis(50),
         );
         AppState::new(
             auth,
             token_config,
             Arc::new(StaticReadiness::ready()),
-            sqlx::PgPool::connect_lazy("postgres://localhost/test")
-                .unwrap_or_else(|_| panic!("test pool")),
+            PgPoolOptions::new().connect_lazy_with(PgConnectOptions::new()),
             engine,
             Hub::new(),
         )

@@ -75,7 +75,7 @@ impl AppState {
 
     /// Sets the faucet enabled flag.
     #[must_use]
-    pub fn with_faucet_enabled(mut self, enabled: bool) -> Self {
+    pub const fn with_faucet_enabled(mut self, enabled: bool) -> Self {
         self.faucet_enabled = enabled;
         self
     }

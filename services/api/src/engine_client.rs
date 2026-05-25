@@ -73,10 +73,7 @@ impl EngineClient {
 
     /// Attaches a channel that receives unsolicited engine events for the WS hub.
     #[must_use]
-    pub fn with_event_tx(
-        mut self,
-        tx: tokio::sync::mpsc::Sender<SequencedEngineEvent>,
-    ) -> Self {
+    pub fn with_event_tx(mut self, tx: tokio::sync::mpsc::Sender<SequencedEngineEvent>) -> Self {
         self.event_tx = Some(tx);
         self
     }
@@ -145,10 +142,7 @@ impl EngineClient {
         req: CancelAllRequest,
     ) -> Result<CancelAllAck, EngineClientError> {
         let request_id = req.request_id;
-        match self
-            .send(EngineRequest::CancelAll(req), request_id)
-            .await?
-        {
+        match self.send(EngineRequest::CancelAll(req), request_id).await? {
             EngineResponse::Ack(AckResponse {
                 result: AckResult::CancelAll(ack),
                 ..
@@ -167,10 +161,7 @@ impl EngineClient {
     /// Returns [`EngineClientError`] on IO failure, timeout, or engine reject.
     pub async fn snapshot(&self, req: SnapshotRequest) -> Result<BookSnapshot, EngineClientError> {
         let request_id = req.request_id;
-        match self
-            .send(EngineRequest::Snapshot(req), request_id)
-            .await?
-        {
+        match self.send(EngineRequest::Snapshot(req), request_id).await? {
             EngineResponse::Ack(AckResponse {
                 result: AckResult::Snapshot(snap),
                 ..
@@ -283,7 +274,7 @@ async fn reader_loop(
     pending.clear();
 }
 
-fn response_id(response: &EngineResponse) -> Option<Uuid> {
+const fn response_id(response: &EngineResponse) -> Option<Uuid> {
     match response {
         EngineResponse::Ack(r) => Some(r.request_id),
         EngineResponse::Reject(r) => Some(r.request_id),

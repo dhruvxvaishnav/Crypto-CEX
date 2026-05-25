@@ -1,3 +1,7 @@
+// TCP integration tests use expect/panic to keep protocol assertion failures compact.
+// AGENTS.md §4.2 exempts test code from these lints.
+#![allow(clippy::expect_used, clippy::panic)]
+
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;

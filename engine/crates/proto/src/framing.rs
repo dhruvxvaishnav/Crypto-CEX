@@ -36,7 +36,7 @@ pub enum FrameError {
 /// Returns [`FrameError`] for IO errors, oversized frames, or invalid JSON.
 pub async fn read_json_frame<R, T>(reader: &mut R) -> Result<Option<T>, FrameError>
 where
-    R: AsyncRead + Unpin,
+    R: AsyncRead + Unpin + Send,
     T: DeserializeOwned,
 {
     let mut len_buf = [0_u8; 4];
@@ -70,8 +70,8 @@ where
 /// underlying writer fails.
 pub async fn write_json_frame<W, T>(writer: &mut W, frame: &T) -> Result<(), FrameError>
 where
-    W: AsyncWrite + Unpin,
-    T: Serialize,
+    W: AsyncWrite + Unpin + Send,
+    T: Serialize + Sync,
 {
     let payload = serde_json::to_vec(frame)?;
     if payload.len() > MAX_FRAME_BYTES {
@@ -92,24 +92,27 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use tokio::io::duplex;
 
-    use crate::{read_json_frame, write_json_frame, EngineRequest, PingRequest};
+    use crate::{read_json_frame, write_json_frame, EngineRequest, FrameError, PingRequest};
 
     #[tokio::test]
-    async fn frame_round_trips_request() {
+    async fn frame_round_trips_request() -> Result<(), FrameError> {
         let (mut client, mut server) = duplex(1024);
         let request_id = uuid::Uuid::nil();
         let frame = EngineRequest::Ping(PingRequest { request_id });
 
-        write_json_frame(&mut client, &frame)
-            .await
-            .expect("write succeeds");
-        let decoded: EngineRequest = read_json_frame(&mut server)
-            .await
-            .expect("read succeeds")
-            .expect("frame exists");
+        write_json_frame(&mut client, &frame).await?;
+        let decoded: EngineRequest = read_json_frame(&mut server).await?.ok_or_else(|| {
+            FrameError::Io(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "frame missing",
+            ))
+        })?;
 
         assert_eq!(decoded, frame);
+        Ok(())
     }
 }

@@ -32,12 +32,15 @@ struct OpenOrder {
     remaining: Decimal,
 }
 
-pub(crate) struct ResponseBundle {
-    pub(crate) response: EngineResponse,
-    pub(crate) events: Vec<SequencedEngineEvent>,
+type ReplayState = (HashMap<String, OrderBook>, HashMap<Uuid, OpenOrder>);
+
+pub struct ResponseBundle {
+    pub(super) response: EngineResponse,
+    pub(super) events: Vec<SequencedEngineEvent>,
 }
 
-pub(crate) struct EngineState {
+#[allow(clippy::module_name_repetitions)]
+pub struct EngineState {
     books: HashMap<String, OrderBook>,
     command_wal: Wal,
     event_log: EventLog,
@@ -50,7 +53,7 @@ pub(crate) struct EngineState {
 }
 
 impl EngineState {
-    pub(crate) fn open(
+    pub(super) fn open(
         config: &EngineServerConfig,
         event_tx: broadcast::Sender<SequencedEngineEvent>,
         id_source: Arc<dyn IdSource>,
@@ -72,11 +75,11 @@ impl EngineState {
         })
     }
 
-    pub(crate) fn subscribe(&self) -> broadcast::Receiver<SequencedEngineEvent> {
+    pub(super) fn subscribe(&self) -> broadcast::Receiver<SequencedEngineEvent> {
         self.event_tx.subscribe()
     }
 
-    pub(crate) fn broadcast(&self, event: SequencedEngineEvent) {
+    pub(super) fn broadcast(&self, event: SequencedEngineEvent) {
         if let Err(error) = self.event_tx.send(event) {
             tracing::debug!(
                 skipped_seq = error.0.seq,
@@ -85,20 +88,22 @@ impl EngineState {
         }
     }
 
-    pub(crate) fn handle_request(
+    pub(super) fn handle_request(
         &mut self,
         request: EngineRequest,
     ) -> Result<ResponseBundle, ServerError> {
         match request {
             EngineRequest::Place(request) => self.place_order(request.request_id, request.order),
-            EngineRequest::Cancel(request) => self.cancel_order(request),
-            EngineRequest::CancelAll(request) => {
-                self.cancel_all(request.request_id, request.user_id, request.symbol)
-            }
+            EngineRequest::Cancel(request) => self.cancel_order(&request),
+            EngineRequest::CancelAll(request) => self.cancel_all(
+                request.request_id,
+                request.user_id,
+                request.symbol.as_deref(),
+            ),
             EngineRequest::HaltMarket(request) => self.halt_market(request),
             EngineRequest::ResumeMarket(request) => self.resume_market(request),
-            EngineRequest::Snapshot(request) => Ok(self.snapshot(request)),
-            EngineRequest::Ping(request) => Ok(Self::pong(request)),
+            EngineRequest::Snapshot(request) => Ok(self.snapshot(&request)),
+            EngineRequest::Ping(request) => Ok(Self::pong(&request)),
         }
     }
 
@@ -142,9 +147,7 @@ impl EngineState {
         let (mut wire_events, fills) = self.to_wire_core_events(&symbol, &core_events);
         wire_events.insert(
             0,
-            EngineEvent::OrderAccepted(OrderAcceptedEvent {
-                order: wire_order.clone(),
-            }),
+            EngineEvent::OrderAccepted(OrderAcceptedEvent { order: wire_order }),
         );
         wire_events.push(self.book_delta_event(&symbol));
         let events = self.sequence_events(wire_events)?;
@@ -166,7 +169,7 @@ impl EngineState {
         })
     }
 
-    fn cancel_order(&mut self, request: CancelRequest) -> Result<ResponseBundle, ServerError> {
+    fn cancel_order(&mut self, request: &CancelRequest) -> Result<ResponseBundle, ServerError> {
         let Some(meta) = self.open_orders.get(&request.order_id).cloned() else {
             return Ok(order_not_found(request.request_id, "order was not found"));
         };
@@ -182,7 +185,7 @@ impl EngineState {
             return Ok(order_not_found(request.request_id, "order was not found"));
         }
 
-        let mut wire_events = self.to_wire_cancel_events(&core_events);
+        let mut wire_events = Self::to_wire_cancel_events(&core_events);
         wire_events.push(self.book_delta_event(&request.symbol));
         let events = self.sequence_events(wire_events)?;
         let seq = last_seq_or_current(&events, self.event_log.sequence());
@@ -205,13 +208,13 @@ impl EngineState {
         &mut self,
         request_id: Uuid,
         user_id: Uuid,
-        symbol: Option<String>,
+        symbol: Option<&str>,
     ) -> Result<ResponseBundle, ServerError> {
         let mut order_ids: Vec<Uuid> = self
             .open_orders
             .iter()
             .filter(|(_, meta)| meta.user_id == user_id)
-            .filter(|(_, meta)| symbol.as_ref().map_or(true, |s| s == &meta.symbol))
+            .filter(|(_, meta)| symbol.is_none_or(|s| s == meta.symbol))
             .map(|(order_id, _)| *order_id)
             .collect();
         order_ids.sort_unstable();
@@ -229,7 +232,7 @@ impl EngineState {
             }
             changed_symbols.insert(meta.symbol);
             canceled_ids.extend(cancelled_order_ids(&core_events));
-            wire_events.extend(self.to_wire_cancel_events(&core_events));
+            wire_events.extend(Self::to_wire_cancel_events(&core_events));
         }
         canceled_ids.sort_unstable();
         canceled_ids.dedup();
@@ -291,7 +294,7 @@ impl EngineState {
         })
     }
 
-    fn snapshot(&self, request: SnapshotRequest) -> ResponseBundle {
+    fn snapshot(&self, request: &SnapshotRequest) -> ResponseBundle {
         let depth = request.depth.min(self.snapshot_depth);
         let snapshot = self.book_snapshot(&request.symbol, depth);
         ResponseBundle {
@@ -303,7 +306,7 @@ impl EngineState {
         }
     }
 
-    fn pong(request: PingRequest) -> ResponseBundle {
+    const fn pong(request: &PingRequest) -> ResponseBundle {
         ResponseBundle {
             response: EngineResponse::Pong(PongResponse {
                 request_id: request.request_id,
@@ -368,7 +371,7 @@ impl EngineState {
         (wire_events, fills)
     }
 
-    fn to_wire_cancel_events(&self, events: &[CoreEngineEvent]) -> Vec<EngineEvent> {
+    fn to_wire_cancel_events(events: &[CoreEngineEvent]) -> Vec<EngineEvent> {
         events
             .iter()
             .filter_map(|event| match event {
@@ -419,9 +422,7 @@ impl EngineState {
     }
 }
 
-fn replay_books(
-    path: &std::path::Path,
-) -> Result<(HashMap<String, OrderBook>, HashMap<Uuid, OpenOrder>), ServerError> {
+fn replay_books(path: &std::path::Path) -> Result<ReplayState, ServerError> {
     let entries = Wal::replay(path)?;
     let mut books: HashMap<String, OrderBook> = HashMap::new();
     let mut open_orders: HashMap<Uuid, OpenOrder> = HashMap::new();

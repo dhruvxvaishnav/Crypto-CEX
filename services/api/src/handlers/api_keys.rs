@@ -72,8 +72,12 @@ pub async fn create_api_key(
     payload: Result<Json<CreateApiKeyInput>, axum::extract::rejection::JsonRejection>,
 ) -> Result<impl IntoResponse, ApiError> {
     let Json(input) = payload.map_err(|_| {
-        ApiError::new(StatusCode::BAD_REQUEST, ErrorCode::Internal, "Invalid JSON body")
-            .with_request_id(ctx.request_id)
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            ErrorCode::Internal,
+            "Invalid JSON body",
+        )
+        .with_request_id(ctx.request_id)
     })?;
 
     // Validate label.
@@ -207,10 +211,12 @@ pub async fn revoke_api_key(
         })?;
 
     if !revoked {
-        return Err(
-            ApiError::new(StatusCode::NOT_FOUND, ErrorCode::NotFound, "API key not found")
-                .with_request_id(ctx.request_id),
-        );
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            ErrorCode::NotFound,
+            "API key not found",
+        )
+        .with_request_id(ctx.request_id));
     }
 
     tracing::info!(

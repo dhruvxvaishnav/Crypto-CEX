@@ -190,8 +190,12 @@ pub async fn faucet(
     payload: Result<Json<FaucetInput>, axum::extract::rejection::JsonRejection>,
 ) -> Result<impl IntoResponse, ApiError> {
     let Json(input) = payload.map_err(|_| {
-        ApiError::new(StatusCode::BAD_REQUEST, ErrorCode::Internal, "Invalid JSON body")
-            .with_request_id(ctx.request_id)
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            ErrorCode::Internal,
+            "Invalid JSON body",
+        )
+        .with_request_id(ctx.request_id)
     })?;
 
     let amount = input.amount.parse::<rust_decimal::Decimal>().map_err(|_| {
@@ -219,8 +223,12 @@ pub async fn faucet(
             ApiError::internal()
         })?
         .ok_or_else(|| {
-            ApiError::new(StatusCode::NOT_FOUND, ErrorCode::NotFound, "Asset not found")
-                .with_request_id(ctx.request_id)
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                ErrorCode::NotFound,
+                "Asset not found",
+            )
+            .with_request_id(ctx.request_id)
         })?;
 
     if amount > faucet_max {
@@ -233,13 +241,12 @@ pub async fn faucet(
     }
 
     let deposit_id = Uuid::new_v4();
-    let new_available =
-        repo::apply_faucet(&state.db, caller.user_id, asset_id, amount, deposit_id)
-            .await
-            .map_err(|err| {
-                tracing::error!(err = %err, request_id = %ctx.request_id, "wallet.faucet.apply_error");
-                ApiError::internal()
-            })?;
+    let new_available = repo::apply_faucet(&state.db, caller.user_id, asset_id, amount, deposit_id)
+        .await
+        .map_err(|err| {
+            tracing::error!(err = %err, request_id = %ctx.request_id, "wallet.faucet.apply_error");
+            ApiError::internal()
+        })?;
 
     tracing::info!(
         event = "wallet.faucet.credited",

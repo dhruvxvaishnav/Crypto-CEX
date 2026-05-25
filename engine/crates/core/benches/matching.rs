@@ -93,7 +93,7 @@ fn bench_match_random_limit_orders(c: &mut Criterion) {
     c.bench_function("bench_match_random_limit_orders", |b| {
         b.iter(|| {
             let mut book = OrderBook::new();
-            for order in orders.iter() {
+            for order in &orders {
                 black_box(book.match_order(order.clone()));
             }
             black_box(book);

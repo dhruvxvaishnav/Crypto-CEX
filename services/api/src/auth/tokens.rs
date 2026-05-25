@@ -26,7 +26,7 @@ pub struct TokenConfig {
 }
 
 /// Access token claims.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AccessClaims {
     /// Subject user ID.
     pub sub: Uuid,

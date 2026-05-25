@@ -191,12 +191,9 @@ async fn handle_client_message(
     forwarder_handles: &mut Vec<JoinHandle<()>>,
     user_id: Option<Uuid>,
 ) {
-    let msg: ClientMessage = match serde_json::from_str(raw) {
-        Ok(m) => m,
-        Err(_) => {
-            send_error_to_tx(out_tx, None, "INVALID_MESSAGE", "Invalid JSON message");
-            return;
-        }
+    let Ok(msg) = serde_json::from_str::<ClientMessage>(raw) else {
+        send_error_to_tx(out_tx, None, "INVALID_MESSAGE", "Invalid JSON message");
+        return;
     };
 
     match msg.method.as_str() {
@@ -308,7 +305,7 @@ async fn send_book_snapshot(
     }
 
     // Full snapshot from engine.
-    let snap = match state
+    let Ok(snap) = state
         .engine
         .snapshot(cex_proto::SnapshotRequest {
             request_id: Uuid::new_v4(),
@@ -316,9 +313,8 @@ async fn send_book_snapshot(
             depth: 100,
         })
         .await
-    {
-        Ok(s) => s,
-        Err(_) => return,
+    else {
+        return;
     };
 
     let bids: Vec<[String; 2]> = snap
@@ -359,7 +355,12 @@ fn send_to_tx<T: Serialize>(out_tx: &UnboundedSender<WsFrame>, value: &T) {
     let _ = out_tx.send(Arc::new(Bytes::from(bytes)));
 }
 
-fn send_error_to_tx(out_tx: &UnboundedSender<WsFrame>, id: Option<String>, code: &str, message: &str) {
+fn send_error_to_tx(
+    out_tx: &UnboundedSender<WsFrame>,
+    id: Option<String>,
+    code: &str,
+    message: &str,
+) {
     let msg = ServerError {
         id,
         error: ErrorPayload {

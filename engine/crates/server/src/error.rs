@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinError;
 
 /// Errors emitted by the engine TCP server.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Error)]
 pub enum ServerError {
     /// Engine must bind only to loopback per PRD §12.1.

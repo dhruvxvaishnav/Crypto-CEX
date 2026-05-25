@@ -27,6 +27,7 @@ pub enum EngineEvent {
 }
 
 /// Aggregated L2 book depth, best price first on both sides.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BookDepth {
     /// Bid levels as `(price, total_quantity)`, highest price first.
@@ -271,7 +272,7 @@ impl OrderBook {
         match taker.side {
             Side::Buy => {
                 for (price, queue) in &self.asks {
-                    if taker.price.map_or(false, |limit| *price > limit) {
+                    if taker.price.is_some_and(|limit| *price > limit) {
                         break;
                     }
                     available += queue.iter().map(|o| o.remaining).sum::<Decimal>();
@@ -282,7 +283,7 @@ impl OrderBook {
             }
             Side::Sell => {
                 for (price, queue) in self.bids.iter().rev() {
-                    if taker.price.map_or(false, |limit| *price < limit) {
+                    if taker.price.is_some_and(|limit| *price < limit) {
                         break;
                     }
                     available += queue.iter().map(|o| o.remaining).sum::<Decimal>();
@@ -301,8 +302,8 @@ impl OrderBook {
             return false;
         };
         match taker.side {
-            Side::Buy => self.best_ask().map_or(false, |best| best <= taker_price),
-            Side::Sell => self.best_bid().map_or(false, |best| best >= taker_price),
+            Side::Buy => self.best_ask().is_some_and(|best| best <= taker_price),
+            Side::Sell => self.best_bid().is_some_and(|best| best >= taker_price),
         }
     }
 

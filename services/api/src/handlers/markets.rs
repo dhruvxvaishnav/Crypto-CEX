@@ -107,12 +107,10 @@ pub async fn list_markets(
     State(state): State<AppState>,
     axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let rows = repo::list_markets(&state.db)
-        .await
-        .map_err(|err| {
-            tracing::error!(err = %err, request_id = %ctx.request_id, "markets.list.db_error");
-            ApiError::internal()
-        })?;
+    let rows = repo::list_markets(&state.db).await.map_err(|err| {
+        tracing::error!(err = %err, request_id = %ctx.request_id, "markets.list.db_error");
+        ApiError::internal()
+    })?;
 
     let body: Vec<MarketResponse> = rows.into_iter().map(market_row_to_response).collect();
     Ok(Json(serde_json::json!({ "data": body })))
@@ -135,7 +133,11 @@ pub async fn get_market(
             ApiError::internal()
         })?
         .ok_or_else(|| {
-            ApiError::new(StatusCode::NOT_FOUND, ErrorCode::MarketUnknown, "Market not found")
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                ErrorCode::MarketUnknown,
+                "Market not found",
+            )
         })?;
 
     Ok(Json(market_row_to_response(row)))
@@ -234,10 +236,9 @@ pub async fn get_klines(
         .from
         .and_then(|ts| OffsetDateTime::from_unix_timestamp(ts).ok())
         .unwrap_or(OffsetDateTime::UNIX_EPOCH);
-    let to = q
-        .to
-        .and_then(|ts| OffsetDateTime::from_unix_timestamp(ts).ok())
-        .unwrap_or_else(OffsetDateTime::now_utc);
+    let to =
+        q.to.and_then(|ts| OffsetDateTime::from_unix_timestamp(ts).ok())
+            .unwrap_or_else(OffsetDateTime::now_utc);
     let limit = q.limit.clamp(1, 1000);
 
     let rows = repo::klines(&state.db, &symbol.to_uppercase(), interval, from, to, limit)

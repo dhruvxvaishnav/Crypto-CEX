@@ -20,10 +20,7 @@ pub struct ApiKeyRow {
 /// # Errors
 ///
 /// Returns `sqlx::Error` on DB failure.
-pub async fn find_api_key(
-    pool: &PgPool,
-    key_id: Uuid,
-) -> Result<Option<ApiKeyRow>, sqlx::Error> {
+pub async fn find_api_key(pool: &PgPool, key_id: Uuid) -> Result<Option<ApiKeyRow>, sqlx::Error> {
     sqlx::query_as::<_, ApiKeyRow>(
         r"
         SELECT id, user_id, label, permissions, created_at
@@ -36,7 +33,7 @@ pub async fn find_api_key(
     .await
 }
 
-/// Decrypts the API key secret using pgcrypto pgp_sym_decrypt.
+/// Decrypts the API key secret using pgcrypto `pgp_sym_decrypt`.
 ///
 /// Returns `None` if the key has no secret (should never happen in practice).
 ///
@@ -91,7 +88,7 @@ pub async fn create_api_key(
     .await
 }
 
-/// Revokes an API key (sets revoked_at).
+/// Revokes an API key (sets `revoked_at`).
 ///
 /// Returns true if a key was revoked, false if not found.
 ///
@@ -122,10 +119,7 @@ pub async fn revoke_api_key(
 /// # Errors
 ///
 /// Returns `sqlx::Error` on DB failure.
-pub async fn list_api_keys(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Vec<ApiKeyRow>, sqlx::Error> {
+pub async fn list_api_keys(pool: &PgPool, user_id: Uuid) -> Result<Vec<ApiKeyRow>, sqlx::Error> {
     sqlx::query_as::<_, ApiKeyRow>(
         r"
         SELECT id, user_id, label, permissions, created_at
@@ -141,7 +135,7 @@ pub async fn list_api_keys(
 
 // ── TOTP types ────────────────────────────────────────────────────────────────
 
-/// Decrypts the TOTP secret for a user using pgcrypto pgp_sym_decrypt.
+/// Decrypts the TOTP secret for a user using pgcrypto `pgp_sym_decrypt`.
 ///
 /// Returns `None` if the user has no TOTP secret set.
 ///
@@ -211,7 +205,7 @@ pub async fn enable_totp(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error
     .map(|_| ())
 }
 
-/// Returns a user row with password_hash for re-authentication flows.
+/// Returns a user row with `password_hash` for re-authentication flows.
 ///
 /// # Errors
 ///
@@ -326,10 +320,7 @@ pub async fn get_profile(
 /// # Errors
 ///
 /// Returns `sqlx::Error` on DB failure.
-pub async fn list_balances(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Vec<BalanceRow>, sqlx::Error> {
+pub async fn list_balances(pool: &PgPool, user_id: Uuid) -> Result<Vec<BalanceRow>, sqlx::Error> {
     sqlx::query_as::<_, BalanceRow>(
         r"
         SELECT

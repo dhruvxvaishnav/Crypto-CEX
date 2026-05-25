@@ -18,6 +18,8 @@ use crate::errors::{ApiError, ErrorCode};
 use crate::middleware::RequestContext;
 use crate::state::AppState;
 
+type HmacSha256 = Hmac<Sha256>;
+
 const HMAC_KEY_HEADER: &str = "x-aether-key";
 const HMAC_TS_HEADER: &str = "x-aether-ts";
 const HMAC_SIGN_HEADER: &str = "x-aether-sign";
@@ -62,7 +64,9 @@ pub async fn hmac_auth_middleware(
         .extensions()
         .get::<RequestContext>()
         .copied()
-        .unwrap_or(RequestContext { request_id: Uuid::new_v4() });
+        .unwrap_or_else(|| RequestContext {
+            request_id: Uuid::new_v4(),
+        });
 
     match verify(request, &state, ctx).await {
         Ok(request) => next.run(request).await,
@@ -93,7 +97,11 @@ async fn verify(
     let now_ms = now_ms();
     let skew = (now_ms - ts_ms).abs();
     if skew > MAX_SKEW_MS {
-        return Err(sig_error(ErrorCode::SigTimestamp, "Timestamp out of window", ctx));
+        return Err(sig_error(
+            ErrorCode::SigTimestamp,
+            "Timestamp out of window",
+            ctx,
+        ));
     }
 
     // ── Load API key from DB ──────────────────────────────────────────────────
@@ -103,11 +111,14 @@ async fn verify(
         .ok_or_else(|| sig_error(ErrorCode::SigInvalid, "Unknown API key", ctx))?;
 
     // ── Decrypt secret using pgcrypto ─────────────────────────────────────────
-    let raw_secret =
-        crate::repositories::account::decrypt_api_key_secret(&state.db, key_id, &state.pgcrypto_key)
-            .await
-            .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?
-            .ok_or_else(|| sig_error(ErrorCode::SigInvalid, "API key has no secret", ctx))?;
+    let raw_secret = crate::repositories::account::decrypt_api_key_secret(
+        &state.db,
+        key_id,
+        &state.pgcrypto_key,
+    )
+    .await
+    .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?
+    .ok_or_else(|| sig_error(ErrorCode::SigInvalid, "API key has no secret", ctx))?;
 
     // ── Buffer body for signature ─────────────────────────────────────────────
     let (mut parts, body) = request.into_parts();
@@ -122,7 +133,6 @@ async fn verify(
     let payload = format!("{ts_ms}\n{method}\n{path}\n{body_str}");
 
     // ── Compute and verify HMAC-SHA256 ────────────────────────────────────────
-    type HmacSha256 = Hmac<Sha256>;
     let mut mac = HmacSha256::new_from_slice(raw_secret.as_bytes())
         .map_err(|_| ApiError::internal().with_request_id(ctx.request_id))?;
     mac.update(payload.as_bytes());
@@ -136,16 +146,12 @@ async fn verify(
     // ── Replay check (PRD §18.4) ──────────────────────────────────────────────
     let sig_prefix: String = sign_str.chars().take(12).collect();
     let replay_key = format!("hmac_replay:{key_id}:{sig_prefix}");
-    if let Err(err) = check_replay(&state.redis, &replay_key).await {
+    if let Err(err) = check_replay(state.redis.as_ref(), &replay_key).await {
         return Err(err.with_request_id(ctx.request_id));
     }
 
     // ── Inject caller into extensions ─────────────────────────────────────────
-    let permissions: Vec<String> = api_key
-        .permissions
-        .iter()
-        .map(|p| p.to_string())
-        .collect();
+    let permissions: Vec<String> = api_key.permissions.iter().map(Clone::clone).collect();
     parts.extensions.insert(HmacCaller {
         user_id: api_key.user_id,
         key_id,
@@ -157,7 +163,7 @@ async fn verify(
 }
 
 async fn check_replay(
-    redis: &Option<redis::aio::ConnectionManager>,
+    redis: Option<&redis::aio::ConnectionManager>,
     key: &str,
 ) -> Result<(), ApiError> {
     let Some(conn) = redis else {

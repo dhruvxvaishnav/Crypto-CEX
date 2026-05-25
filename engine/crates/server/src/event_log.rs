@@ -5,13 +5,13 @@ use std::path::Path;
 use cex_proto::{EngineEvent, SequencedEngineEvent};
 use tracing::warn;
 
-pub(crate) struct EventLog {
+pub struct EventLog {
     file: BufWriter<File>,
     sequence: u64,
 }
 
 impl EventLog {
-    pub(crate) fn open(path: impl AsRef<Path>) -> io::Result<Self> {
+    pub(super) fn open(path: impl AsRef<Path>) -> io::Result<Self> {
         let path = path.as_ref().to_path_buf();
         let sequence = Self::find_last_seq(&path)?;
         let file = OpenOptions::new().create(true).append(true).open(&path)?;
@@ -21,11 +21,11 @@ impl EventLog {
         })
     }
 
-    pub(crate) fn sequence(&self) -> u64 {
+    pub(super) const fn sequence(&self) -> u64 {
         self.sequence
     }
 
-    pub(crate) fn append_next(&mut self, event: EngineEvent) -> io::Result<SequencedEngineEvent> {
+    pub(super) fn append_next(&mut self, event: EngineEvent) -> io::Result<SequencedEngineEvent> {
         let sequenced = SequencedEngineEvent {
             seq: self.sequence.saturating_add(1),
             event,

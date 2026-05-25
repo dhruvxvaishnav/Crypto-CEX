@@ -130,6 +130,18 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Added trading hotkeys for buy/sell side selection, order form focus, and submit
 - [x] Added focused unit coverage for order payload shaping and hotkey filtering
 
+## Portfolio + Wallet + Account (Day 11)
+
+- [x] Added protected `/portfolio`, `/wallet`, and `/account` App Router pages with the existing dense dark TopBar/layout style
+- [x] Added typed account API helpers for profile, balances, ledger history, faucet, TOTP setup/verify/disable, and API key CRUD
+- [x] Portfolio page now shows estimated USDT value, priced/held/locked asset counts, balances, and ledger history
+- [x] Wallet page now supports demo faucet credits, wallet balances, ledger activity, and local withdrawal address/minimum validation
+- [x] Withdrawal submit is intentionally disabled until the backend `/wallet/withdraw` flow is implemented
+- [x] Account page now supports profile display, 2FA setup/verify/disable UI, backup-code display, API key creation with one-time secret reveal, and revoke actions
+- [x] Added focused account-model tests for portfolio valuation, faucet validation, withdrawal validation, and decimal display
+- [x] `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build` all pass
+- [x] Local route smoke test passed for `/portfolio`, `/wallet`, and `/account` on desktop/mobile viewports with a seeded session cookie
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

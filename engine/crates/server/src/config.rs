@@ -2,6 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
 /// Runtime configuration for the engine TCP server.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct EngineServerConfig {
     /// Loopback address the TCP listener binds to.

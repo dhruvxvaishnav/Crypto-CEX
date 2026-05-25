@@ -38,8 +38,8 @@ async fn main() -> anyhow::Result<()> {
         .context("connecting to postgres")?;
 
     // Connect to Redis for rate limiting and replay protection.
-    let redis_client = redis::Client::open(config.redis_url.as_str())
-        .context("parsing redis URL")?;
+    let redis_client =
+        redis::Client::open(config.redis_url.as_str()).context("parsing redis URL")?;
     let redis_conn = redis::aio::ConnectionManager::new(redis_client)
         .await
         .context("connecting to redis")?;
@@ -49,8 +49,8 @@ async fn main() -> anyhow::Result<()> {
     let hub = Hub::new();
 
     // Persistent multiplexed engine client — wired to hub event channel.
-    let engine_client = EngineClient::new(config.engine_addr, ENGINE_TIMEOUT)
-        .with_event_tx(event_tx);
+    let engine_client =
+        EngineClient::new(config.engine_addr, ENGINE_TIMEOUT).with_event_tx(event_tx);
 
     // Spawn hub background task (converts engine events → WS broadcasts).
     tokio::spawn(hub.clone().run(event_rx));

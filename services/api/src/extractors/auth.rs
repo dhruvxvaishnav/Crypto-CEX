@@ -22,7 +22,7 @@ pub struct AuthenticatedUser {
 }
 
 impl AuthenticatedUser {
-    fn from_claims(claims: AccessClaims) -> Self {
+    const fn from_claims(claims: AccessClaims) -> Self {
         Self {
             user_id: claims.sub,
             kyc_level: claims.kyc,
@@ -46,28 +46,22 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             )
         })?;
 
-        let claims = state
-            .token_config
-            .decode_access_token(raw)
-            .map_err(|err| {
-                let is_expired = err
-                    .to_string()
-                    .to_ascii_lowercase()
-                    .contains("expired");
-                if is_expired {
-                    ApiError::new(
-                        StatusCode::UNAUTHORIZED,
-                        ErrorCode::TokenExpired,
-                        "Access token has expired",
-                    )
-                } else {
-                    ApiError::new(
-                        StatusCode::UNAUTHORIZED,
-                        ErrorCode::TokenInvalid,
-                        "Access token is invalid",
-                    )
-                }
-            })?;
+        let claims = state.token_config.decode_access_token(raw).map_err(|err| {
+            let is_expired = err.to_string().to_ascii_lowercase().contains("expired");
+            if is_expired {
+                ApiError::new(
+                    StatusCode::UNAUTHORIZED,
+                    ErrorCode::TokenExpired,
+                    "Access token has expired",
+                )
+            } else {
+                ApiError::new(
+                    StatusCode::UNAUTHORIZED,
+                    ErrorCode::TokenInvalid,
+                    "Access token is invalid",
+                )
+            }
+        })?;
 
         Ok(Self::from_claims(claims))
     }

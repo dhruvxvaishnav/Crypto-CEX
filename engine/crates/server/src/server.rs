@@ -16,6 +16,7 @@ const EVENT_CHANNEL_CAPACITY: usize = 1_024;
 const RESPONSE_CHANNEL_CAPACITY: usize = 128;
 
 /// Matching-engine TCP server.
+#[allow(clippy::module_name_repetitions)]
 pub struct EngineServer {
     config: EngineServerConfig,
     id_source: Arc<dyn IdSource>,

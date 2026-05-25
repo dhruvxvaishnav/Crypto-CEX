@@ -378,7 +378,7 @@ impl LoginAttempts {
     }
 }
 
-fn increment_window(window: &mut FailureWindow) {
+const fn increment_window(window: &mut FailureWindow) {
     window.count = window.count.saturating_add(1);
 }
 

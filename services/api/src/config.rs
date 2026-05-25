@@ -84,13 +84,12 @@ impl Config {
             });
         }
 
-        let redis_url = optional("REDIS_URL")
-            .unwrap_or_else(|| "redis://127.0.0.1:6379".to_owned());
-        let pgcrypto_key = optional("PGCRYPTO_KEY")
-            .unwrap_or_else(|| "dev-insecure-key".to_owned());
-        let faucet_enabled = optional("FAUCET_ENABLED")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(true);
+        let redis_url =
+            optional("REDIS_URL").unwrap_or_else(|| "redis://127.0.0.1:6379".to_owned());
+        let pgcrypto_key =
+            optional("PGCRYPTO_KEY").unwrap_or_else(|| "dev-insecure-key".to_owned());
+        let faucet_enabled =
+            optional("FAUCET_ENABLED").is_none_or(|v| v.eq_ignore_ascii_case("true"));
 
         Ok(Self {
             app_env,
@@ -99,9 +98,9 @@ impl Config {
             redis_url,
             engine_addr: SocketAddr::new(parse_ip("ENGINE_HOST", &engine_host)?, engine_port),
             jwt_secret,
-            access_token_ttl: Duration::from_secs(15 * 60),
-            mfa_token_ttl: Duration::from_secs(5 * 60),
-            refresh_token_ttl: Duration::from_secs(30 * 24 * 60 * 60),
+            access_token_ttl: Duration::from_mins(15),
+            mfa_token_ttl: Duration::from_mins(5),
+            refresh_token_ttl: Duration::from_hours(720),
             pgcrypto_key,
             faucet_enabled,
         })

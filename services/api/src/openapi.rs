@@ -1,4 +1,6 @@
-//! OpenAPI 3.1 specification for the Aether API (PRD §10.5).
+#![allow(clippy::needless_for_each)]
+
+//! `OpenAPI` 3.1 specification for the Aether API (PRD §10.5).
 //!
 //! The spec is generated via the `utoipa` crate. New handlers should be
 //! annotated with `#[utoipa::path(...)]` and registered in [`AetherApiDoc`].
@@ -7,14 +9,14 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use utoipa::OpenApi;
 
-/// Aether Exchange REST API — OpenAPI 3.1 document.
+/// Aether Exchange REST API — `OpenAPI` 3.1 document.
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "Aether Exchange API",
         version = "1.0.0",
         description = "Portfolio-demonstration crypto spot exchange. \
-                       Not a real exchange — demo funds only.",
+                       Demo funds only.",
         contact(name = "Aether Team")
     ),
     tags(
@@ -107,19 +109,21 @@ struct VerifyTotpSchema {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-/// `GET /openapi.json` — Serve the OpenAPI specification.
+/// `GET /openapi.json` — Serve the `OpenAPI` specification.
 ///
 /// # Errors
 ///
 /// Returns 500 if serialisation of the spec fails (should never happen in practice).
 pub async fn openapi_handler() -> impl IntoResponse {
-    match AetherApiDoc::openapi().to_json() {
-        Ok(json) => (
-            StatusCode::OK,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            json,
-        )
-            .into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    AetherApiDoc::openapi().to_json().map_or_else(
+        |_| StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        |json| {
+            (
+                StatusCode::OK,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                json,
+            )
+                .into_response()
+        },
+    )
 }

@@ -120,12 +120,17 @@ pub async fn setup_totp(
     let qr_data_uri = format!("data:image/png;base64,{qr_base64}");
 
     // Persist encrypted secret.
-    repo::store_totp_secret(&state.db, caller.user_id, &secret_base32, &state.pgcrypto_key)
-        .await
-        .map_err(|err| {
-            tracing::error!(err = %err, request_id = %ctx.request_id, "totp.setup.store_error");
-            ApiError::internal().with_request_id(ctx.request_id)
-        })?;
+    repo::store_totp_secret(
+        &state.db,
+        caller.user_id,
+        &secret_base32,
+        &state.pgcrypto_key,
+    )
+    .await
+    .map_err(|err| {
+        tracing::error!(err = %err, request_id = %ctx.request_id, "totp.setup.store_error");
+        ApiError::internal().with_request_id(ctx.request_id)
+    })?;
 
     tracing::info!(event = "auth.totp.setup", user_id = %caller.user_id);
 
@@ -276,18 +281,17 @@ async fn load_totp(
     email: String,
     request_id: uuid::Uuid,
 ) -> Result<TOTP, ApiError> {
-    let secret_base32 =
-        repo::decrypt_totp_secret(&state.db, user_id, &state.pgcrypto_key)
-            .await
-            .map_err(|_| ApiError::internal().with_request_id(request_id))?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::BAD_REQUEST,
-                    ErrorCode::MfaInvalid,
-                    "TOTP setup not initiated; call /auth/2fa/setup first",
-                )
-                .with_request_id(request_id)
-            })?;
+    let secret_base32 = repo::decrypt_totp_secret(&state.db, user_id, &state.pgcrypto_key)
+        .await
+        .map_err(|_| ApiError::internal().with_request_id(request_id))?
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                ErrorCode::MfaInvalid,
+                "TOTP setup not initiated; call /auth/2fa/setup first",
+            )
+            .with_request_id(request_id)
+        })?;
 
     let secret_bytes = Secret::Encoded(secret_base32)
         .to_bytes()

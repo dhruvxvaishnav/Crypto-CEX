@@ -18,12 +18,12 @@ use crate::repositories::markets as market_repo;
 const CHANNEL_CAPACITY: usize = 256;
 
 /// How long to retain diff frames in the per-symbol replay buffer.
-const REPLAY_WINDOW: Duration = Duration::from_secs(60);
+const REPLAY_WINDOW: Duration = Duration::from_mins(1);
 
 /// Serialised WebSocket frame, shared by reference across all subscribers.
 pub type WsFrame = Arc<Bytes>;
 
-/// Replay buffer entry: (captured_at, frame).
+/// Replay buffer entry: (`captured_at`, frame).
 type ReplayEntry = (Instant, WsFrame);
 
 /// Lightweight handle to the WebSocket subscription hub.
@@ -50,6 +50,7 @@ impl Hub {
     }
 
     /// Returns a receiver for `channel`, creating the sender on first call.
+    #[must_use]
     pub fn subscribe(&self, channel: &str) -> broadcast::Receiver<WsFrame> {
         self.senders
             .entry(channel.into())
@@ -85,13 +86,15 @@ impl Hub {
     #[must_use]
     pub fn replay_diffs(&self, symbol: &str, after_seq: u64) -> Option<Vec<WsFrame>> {
         let channel = channels::book_diff(symbol);
-        let entry = self.replay.get(channel.as_str())?;
         let now = Instant::now();
-        let recent: Vec<WsFrame> = entry
-            .iter()
-            .filter(|(ts, _)| now.duration_since(*ts) < REPLAY_WINDOW)
-            .map(|(_, f)| Arc::clone(f))
-            .collect();
+        let recent: Vec<WsFrame> = {
+            let entry = self.replay.get(channel.as_str())?;
+            entry
+                .iter()
+                .filter(|(ts, _)| now.duration_since(*ts) < REPLAY_WINDOW)
+                .map(|(_, f)| Arc::clone(f))
+                .collect()
+        };
         // If after_seq is beyond our buffer we can't help.
         // usize::try_from is fallible on 32-bit; treat overflow as gap-too-large.
         let seq_idx = usize::try_from(after_seq).unwrap_or(usize::MAX);
@@ -147,7 +150,7 @@ impl Hub {
                 "priceChangePct":  price_change_pct.map(|d| d.to_string()),
             });
             let channel = channels::ticker(&snap.symbol);
-            let frame = make_frame(serde_json::json!({
+            let frame = make_frame(&serde_json::json!({
                 "channel": channel,
                 "data": &item,
             }));
@@ -156,7 +159,7 @@ impl Hub {
         }
 
         if !all_items.is_empty() {
-            let all_frame = make_frame(serde_json::json!({
+            let all_frame = make_frame(&serde_json::json!({
                 "channel": channels::TICKER_ALL,
                 "data": all_items,
             }));
@@ -167,17 +170,17 @@ impl Hub {
     fn dispatch(&self, seq_event: SequencedEngineEvent) {
         let SequencedEngineEvent { seq, event } = seq_event;
         match event {
-            EngineEvent::BookDelta(delta) => self.on_book_delta(delta, seq),
-            EngineEvent::Fill(fill) => self.on_fill(fill, seq),
-            EngineEvent::OrderAccepted(e) => self.on_order_accepted_event(e, seq),
-            EngineEvent::OrderCanceled(e) => self.on_order_canceled_event(e, seq),
+            EngineEvent::BookDelta(delta) => self.on_book_delta(&delta, seq),
+            EngineEvent::Fill(fill) => self.on_fill(&fill, seq),
+            EngineEvent::OrderAccepted(e) => self.on_order_accepted_event(&e, seq),
+            EngineEvent::OrderCanceled(e) => self.on_order_canceled_event(&e, seq),
             EngineEvent::OrderRested(_) | EngineEvent::MarketStatus(_) => {}
         }
     }
 
-    fn on_book_delta(&self, delta: BookDeltaEvent, seq: u64) {
+    fn on_book_delta(&self, delta: &BookDeltaEvent, seq: u64) {
         let channel = channels::book_diff(&delta.symbol);
-        let frame = make_frame(serde_json::json!({
+        let frame = make_frame(&serde_json::json!({
             "channel": channel,
             "seq": seq,
             "data": {
@@ -189,9 +192,9 @@ impl Hub {
         self.publish_with_replay(&channel, frame);
     }
 
-    fn on_fill(&self, fill: TradeFill, seq: u64) {
+    fn on_fill(&self, fill: &TradeFill, seq: u64) {
         let trade_channel = channels::trade(&fill.symbol);
-        let frame = make_frame(serde_json::json!({
+        let frame = make_frame(&serde_json::json!({
             "channel": trade_channel,
             "seq": seq,
             "data": {
@@ -205,7 +208,7 @@ impl Hub {
         self.publish(&trade_channel, Arc::clone(&frame));
 
         // Private user.fills for both taker and maker sides.
-        let user_fill_frame = make_frame(serde_json::json!({
+        let user_fill_frame = make_frame(&serde_json::json!({
             "channel": channels::USER_FILLS,
             "seq": seq,
             "data": {
@@ -222,12 +225,8 @@ impl Hub {
         self.publish(channels::USER_FILLS, user_fill_frame);
     }
 
-    fn on_order_accepted_event(
-        &self,
-        event: cex_proto::OrderAcceptedEvent,
-        seq: u64,
-    ) {
-        let frame = make_frame(serde_json::json!({
+    fn on_order_accepted_event(&self, event: &cex_proto::OrderAcceptedEvent, seq: u64) {
+        let frame = make_frame(&serde_json::json!({
             "channel": channels::USER_ORDERS,
             "seq": seq,
             "data": { "orderId": event.order.id, "status": "new" }
@@ -235,12 +234,8 @@ impl Hub {
         self.publish(channels::USER_ORDERS, frame);
     }
 
-    fn on_order_canceled_event(
-        &self,
-        event: cex_proto::OrderCanceledEvent,
-        seq: u64,
-    ) {
-        let frame = make_frame(serde_json::json!({
+    fn on_order_canceled_event(&self, event: &cex_proto::OrderCanceledEvent, seq: u64) {
+        let frame = make_frame(&serde_json::json!({
             "channel": channels::USER_ORDERS,
             "seq": seq,
             "data": { "orderId": event.order_id, "status": "canceled", "reason": event.reason }
@@ -249,8 +244,15 @@ impl Hub {
     }
 
     /// Publishes a balance update to the `user.balances` private channel.
-    pub fn publish_balance_update(&self, user_id: Uuid, asset: &str, available: &str, locked: &str, seq: u64) {
-        let frame = make_frame(serde_json::json!({
+    pub fn publish_balance_update(
+        &self,
+        user_id: Uuid,
+        asset: &str,
+        available: &str,
+        locked: &str,
+        seq: u64,
+    ) {
+        let frame = make_frame(&serde_json::json!({
             "channel": channels::USER_BALANCES,
             "seq": seq,
             "data": {
@@ -270,8 +272,8 @@ impl Default for Hub {
     }
 }
 
-fn make_frame(value: serde_json::Value) -> WsFrame {
-    let bytes = serde_json::to_vec(&value).unwrap_or_default();
+fn make_frame(value: &serde_json::Value) -> WsFrame {
+    let bytes = serde_json::to_vec(value).unwrap_or_default();
     Arc::new(Bytes::from(bytes))
 }
 

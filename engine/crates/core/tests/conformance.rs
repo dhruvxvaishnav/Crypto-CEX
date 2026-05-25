@@ -3,6 +3,10 @@
 //! Every case uses a fresh `OrderBook::new()` and asserts exact event sequences.
 //! At least 40 cases are required; this file contains 45.
 
+// The conformance suite favors compact, exact event-sequence assertions.
+// AGENTS.md §4.2 exempts tests from panic/expect restrictions.
+#![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+
 use cex_core::book::{EngineEvent, OrderBook};
 use cex_core::types::{CancelReason, Fill, Order, OrderType, Side, StpMode};
 use rust_decimal::Decimal;
@@ -67,7 +71,7 @@ fn fill_event(
     })
 }
 
-fn cancelled(id: Uuid, reason: CancelReason) -> EngineEvent {
+const fn cancelled(id: Uuid, reason: CancelReason) -> EngineEvent {
     EngineEvent::Cancelled {
         order_id: id,
         reason,
