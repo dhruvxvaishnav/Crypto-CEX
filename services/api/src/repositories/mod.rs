@@ -4,6 +4,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub mod account;
+pub mod admin;
 pub mod markets;
 pub mod orders;
 pub mod postgres;

@@ -160,6 +160,16 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Verification passed: `cargo check --manifest-path services/Cargo.toml -p cex-api`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, `cargo test --manifest-path services/Cargo.toml -p cex-api`, `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build`
 - [x] In-app browser smoke test passed for `/markets/BTCUSDT/replay?from=1700000000&speed=4` route shell
 
+## Differentiators (Day 12 Part 3)
+
+- [x] Added engine-client support for market halt/resume commands
+- [x] Added admin backend routes: `POST /admin/markets/:symbol/halt`, `POST /admin/markets/:symbol/resume`, `POST /admin/markets/:symbol/cancel-all`, `POST /admin/users/:id/freeze`, and `GET /admin/engine/state`
+- [x] Added admin authorization guard using `users.is_admin=true` and active account status
+- [x] Added audit-log writes for halt, resume, cancel-all, and freeze-user actions
+- [x] Added `/admin` frontend console with market controls, freeze-user form, last-action summary, and engine-state table
+- [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
+- [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

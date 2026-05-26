@@ -5,10 +5,10 @@ const PUBLIC_PATHS = new Set([
   "/",
   "/markets",
   "/proof-of-reserves",
-  "/auth/login",
-  "/auth/signup",
-  "/auth/2fa",
-  "/auth/forgot",
+  "/login",
+  "/signup",
+  "/2fa",
+  "/forgot",
 ]);
 
 const AUTH_ONLY_PREFIXES = ["/trade", "/portfolio", "/wallet", "/account", "/admin"];
@@ -32,7 +32,7 @@ export function proxy(request: NextRequest): NextResponse {
   // httpOnly refresh token is the session indicator.
   const hasSession = request.cookies.has("aether_refresh");
   if (!hasSession) {
-    const loginUrl = new URL("/auth/login", request.url);
+    const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

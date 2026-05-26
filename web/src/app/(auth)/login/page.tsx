@@ -35,7 +35,7 @@ export default function LoginPage() {
       const result = await login(values.email, values.password);
       if (result?.mfaRequired) {
         // Redirect to 2FA page with the mfa_token.
-        router.push(`/auth/2fa?token=${encodeURIComponent(result.mfaToken)}`);
+        router.push(`/2fa?token=${encodeURIComponent(result.mfaToken)}`);
       }
       // Otherwise login() already navigated to /trade/BTCUSDT.
     } catch (err) {
@@ -76,7 +76,7 @@ export default function LoginPage() {
             {...register("password")}
           />
           <Link
-            href="/auth/forgot"
+            href="/forgot"
             className="self-end text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             Forgot password?
@@ -99,10 +99,7 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-xs text-zinc-500">
         No account?{" "}
-        <Link
-          href="/auth/signup"
-          className="text-emerald-400 hover:text-emerald-300 transition-colors"
-        >
+        <Link href="/signup" className="text-emerald-400 hover:text-emerald-300 transition-colors">
           Create one
         </Link>
       </p>

@@ -39,7 +39,7 @@ export default function ForgotPage() {
           If an account exists for that email, a reset link has been sent.
         </p>
         <Link
-          href="/auth/login"
+          href="/login"
           className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
         >
           Back to sign in
@@ -69,10 +69,7 @@ export default function ForgotPage() {
       </form>
 
       <p className="mt-6 text-center text-xs text-zinc-500">
-        <Link
-          href="/auth/login"
-          className="text-emerald-400 hover:text-emerald-300 transition-colors"
-        >
+        <Link href="/login" className="text-emerald-400 hover:text-emerald-300 transition-colors">
           Back to sign in
         </Link>
       </p>

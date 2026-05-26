@@ -256,3 +256,23 @@ export interface MyProof {
   generatedAt: string;
   entries: ProofEntry[];
 }
+
+export interface AdminActionResponse {
+  symbol: string | null;
+  status: string | null;
+  canceledOrderIds: string[];
+  count: number;
+}
+
+export interface AdminEngineMarketState {
+  symbol: string;
+  status: "trading" | "halted" | "delisted";
+  openOrderCount: number;
+  bestBid: PriceLevelTuple | null;
+  bestAsk: PriceLevelTuple | null;
+  seq: number | null;
+}
+
+export interface AdminEngineState {
+  markets: AdminEngineMarketState[];
+}

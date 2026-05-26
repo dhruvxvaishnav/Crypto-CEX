@@ -5,6 +5,9 @@ use axum::Router;
 
 use crate::extractors::hmac::hmac_auth_middleware;
 use crate::handlers::account::{faucet, get_balances, get_history, get_pnl, get_profile};
+use crate::handlers::admin::{
+    cancel_all_in_market, engine_state, freeze_user, halt_market, resume_market,
+};
 use crate::handlers::api_keys::{create_api_key, list_api_keys, revoke_api_key};
 use crate::handlers::auth::{login, refresh, signup};
 use crate::handlers::health::{health, ready};
@@ -58,12 +61,23 @@ pub fn build_router(state: AppState) -> Router {
         .route("/proof-of-reserves/latest", get(latest_proof))
         .route("/proof-of-reserves/me", get(my_proof));
 
+    let admin_routes = Router::new()
+        .route("/admin/markets/{symbol}/halt", post(halt_market))
+        .route("/admin/markets/{symbol}/resume", post(resume_market))
+        .route(
+            "/admin/markets/{symbol}/cancel-all",
+            post(cancel_all_in_market),
+        )
+        .route("/admin/users/{id}/freeze", post(freeze_user))
+        .route("/admin/engine/state", get(engine_state));
+
     let api_v1 = Router::new()
         .merge(auth_routes)
         .merge(market_routes)
         .merge(order_routes)
         .merge(account_routes)
         .merge(proof_routes)
+        .merge(admin_routes)
         // HMAC middleware verifies X-AETHER-* headers and injects HmacCaller extension.
         .layer(from_fn_with_state(state.clone(), hmac_auth_middleware))
         // Rate limiting applied after request-id so request context is available.

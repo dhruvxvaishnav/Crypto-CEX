@@ -4,8 +4,9 @@ use std::time::Duration;
 
 use cex_proto::{
     read_json_frame, write_json_frame, AckResponse, AckResult, BookSnapshot, CancelAck,
-    CancelAllAck, CancelAllRequest, CancelRequest, EngineRequest, EngineResponse, OrderAck,
-    PingRequest, PlaceRequest, RejectResponse, SequencedEngineEvent, SnapshotRequest,
+    CancelAllAck, CancelAllRequest, CancelRequest, EngineRequest, EngineResponse,
+    MarketControlRequest, MarketStatusAck, OrderAck, PingRequest, PlaceRequest, RejectResponse,
+    SequencedEngineEvent, SnapshotRequest,
 };
 use dashmap::DashMap;
 use thiserror::Error;
@@ -145,6 +146,56 @@ impl EngineClient {
         match self.send(EngineRequest::CancelAll(req), request_id).await? {
             EngineResponse::Ack(AckResponse {
                 result: AckResult::CancelAll(ack),
+                ..
+            }) => Ok(ack),
+            EngineResponse::Reject(RejectResponse { code, message, .. }) => {
+                Err(EngineClientError::Rejected { code, message })
+            }
+            _ => Err(EngineClientError::Unexpected),
+        }
+    }
+
+    /// Halts a market; new orders for the symbol are rejected by the engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineClientError`] on IO failure, timeout, or engine reject.
+    pub async fn halt_market(
+        &self,
+        req: MarketControlRequest,
+    ) -> Result<MarketStatusAck, EngineClientError> {
+        let request_id = req.request_id;
+        match self
+            .send(EngineRequest::HaltMarket(req), request_id)
+            .await?
+        {
+            EngineResponse::Ack(AckResponse {
+                result: AckResult::MarketStatus(ack),
+                ..
+            }) => Ok(ack),
+            EngineResponse::Reject(RejectResponse { code, message, .. }) => {
+                Err(EngineClientError::Rejected { code, message })
+            }
+            _ => Err(EngineClientError::Unexpected),
+        }
+    }
+
+    /// Resumes a halted market.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineClientError`] on IO failure, timeout, or engine reject.
+    pub async fn resume_market(
+        &self,
+        req: MarketControlRequest,
+    ) -> Result<MarketStatusAck, EngineClientError> {
+        let request_id = req.request_id;
+        match self
+            .send(EngineRequest::ResumeMarket(req), request_id)
+            .await?
+        {
+            EngineResponse::Ack(AckResponse {
+                result: AckResult::MarketStatus(ack),
                 ..
             }) => Ok(ack),
             EngineResponse::Reject(RejectResponse { code, message, .. }) => {
