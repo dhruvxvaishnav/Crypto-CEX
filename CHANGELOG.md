@@ -9,6 +9,7 @@ All notable changes to Aether are recorded here.
 - Added proof-of-reserves snapshot generation from live customer liabilities, Merkle root commitment to `proof_of_reserves`, public latest-root API, and authenticated per-user proof API.
 - Added `/proof-of-reserves` with liabilities summary, root display, and verify-my-balance panel with leaf payloads and sibling hashes.
 - Added FIFO portfolio P&L via `GET /account/pnl` and surfaced unrealised/realised P&L on the portfolio page.
+- Added replay-mode trade history support via `from`/`to`/`order=asc` query params and a `/markets/[symbol]/replay` page with playback controls, synthetic sandbox book, replay chart, and trade tape.
 
 ### Frontend (Day 9)
 

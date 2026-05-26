@@ -14,6 +14,12 @@ const DEFAULT_TRADES_LIMIT = 80;
 const DEFAULT_KLINES_LIMIT = 500;
 const DEFAULT_KLINE_INTERVAL = "1m";
 
+export interface ReplayTradesParams {
+  from: number;
+  to: number;
+  limit?: number;
+}
+
 export async function getMarkets(): Promise<Market[]> {
   const response = await api.get<ApiDataResponse<Market[]>>("/markets");
   return response.data;
@@ -28,6 +34,22 @@ export async function getOrderBook(symbol: string): Promise<OrderBookSnapshot> {
 export async function getRecentTrades(symbol: string): Promise<Trade[]> {
   const response = await api.get<ApiDataResponse<Trade[]>>(
     `/markets/${encodeURIComponent(symbol)}/trades?limit=${DEFAULT_TRADES_LIMIT}`,
+  );
+  return response.data;
+}
+
+export async function getReplayTrades(
+  symbol: string,
+  params: ReplayTradesParams,
+): Promise<Trade[]> {
+  const query = new URLSearchParams({
+    from: params.from.toString(),
+    limit: (params.limit ?? 1000).toString(),
+    order: "asc",
+    to: params.to.toString(),
+  });
+  const response = await api.get<ApiDataResponse<Trade[]>>(
+    `/markets/${encodeURIComponent(symbol)}/trades?${query.toString()}`,
   );
   return response.data;
 }

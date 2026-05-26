@@ -151,6 +151,15 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Added Rust unit coverage for Merkle determinism, proof verification, liability summaries, and FIFO P&L; added frontend formatting coverage for signed P&L display
 - [x] Verification passed: `cargo check --manifest-path services/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, `cargo test --manifest-path services/Cargo.toml -p cex-api`, `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build`
 
+## Differentiators (Day 12 Part 2)
+
+- [x] Extended `GET /markets/:symbol/trades` with optional replay-window params: `from`, `to`, and `order=asc|desc`, while preserving default newest-first behavior
+- [x] Added typed `getReplayTrades` frontend helper for one-minute replay windows
+- [x] Added `/markets/[symbol]/replay` page with playback controls, speed controls (`1x`, `4x`, `16x`), position slider, synthetic sandbox book, lightweight-charts replay chart, and trade tape
+- [x] Added deterministic replay model tests for query parsing, speed fallback, frame building, book aggregation, and side sorting
+- [x] Verification passed: `cargo check --manifest-path services/Cargo.toml -p cex-api`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, `cargo test --manifest-path services/Cargo.toml -p cex-api`, `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build`
+- [x] In-app browser smoke test passed for `/markets/BTCUSDT/replay?from=1700000000&speed=4` route shell
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

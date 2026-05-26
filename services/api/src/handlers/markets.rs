@@ -67,6 +67,9 @@ struct OrderbookResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct TradesQuery {
+    from: Option<i64>,
+    order: Option<String>,
+    to: Option<i64>,
     #[serde(default = "default_trade_limit")]
     limit: i64,
 }
@@ -178,11 +181,11 @@ pub async fn get_orderbook(
     }))
 }
 
-/// `GET /markets/:symbol/trades?limit=50`
+/// `GET /markets/:symbol/trades?limit=50&from=<unix_s>&to=<unix_s>&order=desc`
 ///
 /// # Errors
 ///
-/// Returns [`ApiError`] on DB failure.
+/// Returns [`ApiError`] on DB failure or invalid query params.
 pub async fn get_trades(
     State(state): State<AppState>,
     Path(symbol): Path<String>,
@@ -190,7 +193,10 @@ pub async fn get_trades(
     axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
 ) -> Result<impl IntoResponse, ApiError> {
     let limit = q.limit.clamp(1, 1000);
-    let rows = repo::recent_trades(&state.db, &symbol.to_uppercase(), limit)
+    let from = optional_unix_timestamp(q.from, "from")?;
+    let to = optional_unix_timestamp(q.to, "to")?;
+    let order = trade_order(q.order.as_deref())?;
+    let rows = repo::recent_trades(&state.db, &symbol.to_uppercase(), from, to, limit, order)
         .await
         .map_err(|err| {
             tracing::error!(err = %err, request_id = %ctx.request_id, "markets.trades.db_error");
@@ -290,4 +296,33 @@ fn price_levels(levels: Vec<(rust_decimal::Decimal, rust_decimal::Decimal)>) -> 
         .into_iter()
         .map(|(p, q)| [p.to_string(), q.to_string()])
         .collect()
+}
+
+fn optional_unix_timestamp(
+    value: Option<i64>,
+    field: &'static str,
+) -> Result<Option<OffsetDateTime>, ApiError> {
+    value
+        .map(|timestamp| {
+            OffsetDateTime::from_unix_timestamp(timestamp).map_err(|_| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    ErrorCode::Internal,
+                    format!("Invalid {field} timestamp"),
+                )
+            })
+        })
+        .transpose()
+}
+
+fn trade_order(value: Option<&str>) -> Result<repo::TradeOrder, ApiError> {
+    match value.unwrap_or("desc") {
+        "asc" => Ok(repo::TradeOrder::Asc),
+        "desc" => Ok(repo::TradeOrder::Desc),
+        _ => Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            ErrorCode::Internal,
+            "Invalid order; use asc|desc",
+        )),
+    }
 }

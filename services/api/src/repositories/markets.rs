@@ -35,6 +35,15 @@ pub struct TradeRow {
     pub created_at: OffsetDateTime,
 }
 
+/// Ordering for trade-history queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TradeOrder {
+    /// Newest trades first.
+    Desc,
+    /// Oldest trades first.
+    Asc,
+}
+
 /// A single kline (OHLCV candle) row.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct KlineRow {
@@ -192,10 +201,14 @@ pub async fn get_market_assets(
 pub async fn recent_trades(
     pool: &PgPool,
     symbol: &str,
+    from: Option<OffsetDateTime>,
+    to: Option<OffsetDateTime>,
     limit: i64,
+    order: TradeOrder,
 ) -> Result<Vec<TradeRow>, sqlx::Error> {
-    sqlx::query_as::<_, TradeRow>(
-        r"
+    let sql = match order {
+        TradeOrder::Desc => {
+            r"
         SELECT
             t.id,
             t.price,
@@ -205,14 +218,38 @@ pub async fn recent_trades(
         FROM trades t
         JOIN markets m ON m.id = t.market_id
         WHERE m.symbol = $1
+          AND ($2::TIMESTAMPTZ IS NULL OR t.created_at >= $2)
+          AND ($3::TIMESTAMPTZ IS NULL OR t.created_at <= $3)
         ORDER BY t.created_at DESC
-        LIMIT $2
-        ",
-    )
-    .bind(symbol)
-    .bind(limit)
-    .fetch_all(pool)
-    .await
+        LIMIT $4
+        "
+        }
+        TradeOrder::Asc => {
+            r"
+        SELECT
+            t.id,
+            t.price,
+            t.quantity,
+            t.taker_side::TEXT      AS taker_side,
+            t.created_at
+        FROM trades t
+        JOIN markets m ON m.id = t.market_id
+        WHERE m.symbol = $1
+          AND ($2::TIMESTAMPTZ IS NULL OR t.created_at >= $2)
+          AND ($3::TIMESTAMPTZ IS NULL OR t.created_at <= $3)
+        ORDER BY t.created_at ASC
+        LIMIT $4
+        "
+        }
+    };
+
+    sqlx::query_as::<_, TradeRow>(sql)
+        .bind(symbol)
+        .bind(from)
+        .bind(to)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
 }
 
 /// Returns klines for a market and interval within `[from, to]`.
