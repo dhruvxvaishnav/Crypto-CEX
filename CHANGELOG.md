@@ -4,6 +4,12 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### Differentiators (Day 12)
+
+- Added proof-of-reserves snapshot generation from live customer liabilities, Merkle root commitment to `proof_of_reserves`, public latest-root API, and authenticated per-user proof API.
+- Added `/proof-of-reserves` with liabilities summary, root display, and verify-my-balance panel with leaf payloads and sibling hashes.
+- Added FIFO portfolio P&L via `GET /account/pnl` and surfaced unrealised/realised P&L on the portfolio page.
+
 ### Frontend (Day 9)
 
 - Added the `/trade/[symbol]` trading screen with shared live WebSocket state, top-bar market context, order book, chart, and recent-trades panels.

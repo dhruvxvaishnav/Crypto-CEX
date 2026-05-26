@@ -9,6 +9,7 @@ import type {
   FaucetInput,
   FaucetResponse,
   LedgerEntry,
+  PnlEntry,
   TotpSetupResponse,
   TotpVerifyResponse,
   UserProfile,
@@ -45,6 +46,11 @@ export async function getLedgerHistory(
     query.set("cursor", params.cursor.toString());
   }
   return api.get<ApiListResponse<LedgerEntry>>(`/account/history?${query.toString()}`);
+}
+
+export async function getPnl(): Promise<PnlEntry[]> {
+  const response = await api.get<ApiDataResponse<PnlEntry[]>>("/account/pnl");
+  return response.data;
 }
 
 export async function requestFaucet(input: FaucetInput): Promise<FaucetResponse> {

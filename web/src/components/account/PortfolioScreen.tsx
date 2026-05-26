@@ -1,16 +1,20 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Activity, CircleDollarSign, LockKeyhole, WalletCards } from "lucide-react";
+import { Activity, CircleDollarSign, LockKeyhole, TrendingUp, WalletCards } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 
 import { AccountShell } from "@/components/account/AccountShell";
-import { estimatePortfolioValue, formatDecimal } from "@/components/account/account-model";
+import {
+  estimatePortfolioValue,
+  formatDecimal,
+  formatSignedDecimal,
+} from "@/components/account/account-model";
 import { AsyncBoundary } from "@/components/ui/AsyncBoundary";
-import { getBalances, getLedgerHistory } from "@/lib/account-api";
+import { getBalances, getLedgerHistory, getPnl } from "@/lib/account-api";
 import { getMarkets } from "@/lib/market-data";
-import type { Balance, LedgerEntry } from "@/types/api.types";
+import type { Balance, LedgerEntry, PnlEntry } from "@/types/api.types";
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("en", {
   day: "2-digit",
@@ -27,6 +31,7 @@ export function PortfolioScreen() {
     queryKey: ["ledger-history", "portfolio"],
     queryFn: () => getLedgerHistory({ limit: 80 }),
   });
+  const pnlQuery = useQuery({ queryKey: ["account-pnl"], queryFn: getPnl });
 
   const balances = balancesQuery.data ?? [];
   const markets = marketsQuery.data ?? [];
@@ -95,6 +100,15 @@ export function PortfolioScreen() {
           </AsyncBoundary>
         </Panel>
       </section>
+
+      <Panel title="FIFO P&L">
+        <AsyncBoundary
+          isLoading={pnlQuery.isLoading}
+          isEmpty={!pnlQuery.isLoading && (pnlQuery.data?.length ?? 0) === 0}
+        >
+          <PnlTable rows={pnlQuery.data ?? []} />
+        </AsyncBoundary>
+      </Panel>
     </AccountShell>
   );
 }
@@ -172,6 +186,46 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
       ))}
     </div>
   );
+}
+
+function PnlTable({ rows }: { rows: PnlEntry[] }) {
+  return (
+    <div className="overflow-auto">
+      <div className="grid min-w-[780px] grid-cols-[100px_1fr_1fr_1fr_1fr_1fr] border-b border-zinc-900 px-4 py-2 text-xs text-zinc-500">
+        <span>Asset</span>
+        <span className="text-right">Qty</span>
+        <span className="text-right">Avg cost</span>
+        <span className="text-right">Market</span>
+        <span className="text-right">Unrealised</span>
+        <span className="text-right">Realised</span>
+      </div>
+      {rows.map((row) => (
+        <div
+          key={row.asset}
+          className="grid min-w-[780px] grid-cols-[100px_1fr_1fr_1fr_1fr_1fr] px-4 text-sm leading-10 hover:bg-zinc-900/70"
+        >
+          <span className="flex items-center gap-2 font-medium text-zinc-100">
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-300" aria-hidden />
+            {row.asset}
+          </span>
+          <span className="text-right text-zinc-300">{formatDecimal(row.qty)}</span>
+          <span className="text-right text-zinc-500">{formatDecimal(row.avgCost)}</span>
+          <span className="text-right text-zinc-300">
+            {row.marketPrice ? formatDecimal(row.marketPrice) : "--"}
+          </span>
+          <PnlCell value={row.unrealisedPnl} />
+          <PnlCell value={row.realisedPnl} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PnlCell({ value }: { value: string | null }) {
+  if (!value) return <span className="text-right text-zinc-600">--</span>;
+  const isLoss = value.startsWith("-");
+  const classes = isLoss ? "text-rose-300" : "text-emerald-300";
+  return <span className={`text-right ${classes}`}>{formatSignedDecimal(value)}</span>;
 }
 
 function formatTime(value: string): string {

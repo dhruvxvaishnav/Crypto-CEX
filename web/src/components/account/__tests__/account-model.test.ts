@@ -5,6 +5,7 @@ import type { Balance, Market } from "@/types/api.types";
 import {
   estimatePortfolioValue,
   formatDecimal,
+  formatSignedDecimal,
   validateFaucetInput,
   validateWithdrawInput,
 } from "../account-model";
@@ -50,6 +51,8 @@ describe("account-model", () => {
   it("formats long decimal strings for compact account display", () => {
     expect(formatDecimal("1.230000000000000000")).toBe("1.23");
     expect(formatDecimal("100.000000000000000000")).toBe("100");
+    expect(formatSignedDecimal("12.340000000000000000")).toBe("+12.34");
+    expect(formatSignedDecimal("-0.500000000000000000")).toBe("-0.5");
   });
 });
 

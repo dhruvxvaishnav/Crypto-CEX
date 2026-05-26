@@ -180,6 +180,15 @@ export interface LedgerEntry {
   ts: string;
 }
 
+export interface PnlEntry {
+  asset: string;
+  qty: string;
+  avgCost: string;
+  marketPrice: string | null;
+  unrealisedPnl: string | null;
+  realisedPnl: string;
+}
+
 export interface FaucetInput {
   asset: string;
   amount: string;
@@ -219,4 +228,31 @@ export interface ApiKey {
 
 export interface CreatedApiKey extends ApiKey {
   secret: string;
+}
+
+export interface ProofLiability {
+  asset: string;
+  total: string;
+}
+
+export interface ProofLatest {
+  snapshotId: string;
+  merkleRoot: string;
+  generatedAt: string;
+  liabilities: ProofLiability[];
+}
+
+export interface ProofEntry {
+  asset: string;
+  total: string;
+  leafPayload: string;
+  leafHash: string;
+  siblingHashes: string[];
+}
+
+export interface MyProof {
+  snapshotId: string;
+  merkleRoot: string;
+  generatedAt: string;
+  entries: ProofEntry[];
 }

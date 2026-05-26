@@ -120,6 +120,12 @@ export function formatDecimal(value: string): string {
   return trimmed ? `${integer}.${trimmed}` : integer;
 }
 
+export function formatSignedDecimal(value: string): string {
+  if (value.startsWith("-")) return `-${formatDecimal(value.slice(1))}`;
+  const formatted = formatDecimal(value);
+  return formatted === "0" ? formatted : `+${formatted}`;
+}
+
 export function getWithdrawMinimum(asset: string): string | null {
   return WITHDRAW_RULES[asset.toUpperCase()]?.minWithdrawal ?? null;
 }

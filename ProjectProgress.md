@@ -142,6 +142,15 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build` all pass
 - [x] Local route smoke test passed for `/portfolio`, `/wallet`, and `/account` on desktop/mobile viewports with a seeded session cookie
 
+## Differentiators (Day 12 Part 1)
+
+- [x] Added proof-of-reserves backend snapshot generation from current non-MM customer liabilities, deterministic SHA-256 Merkle tree construction, root persistence in `proof_of_reserves`, public latest-root endpoint, and authenticated per-user proof endpoint
+- [x] Added FIFO account P&L computation for USDT-quoted assets via `GET /account/pnl`
+- [x] Added public `/proof-of-reserves` page with root/liability summary and verify-my-balance proof panel
+- [x] Added FIFO P&L table to `/portfolio`
+- [x] Added Rust unit coverage for Merkle determinism, proof verification, liability summaries, and FIFO P&L; added frontend formatting coverage for signed P&L display
+- [x] Verification passed: `cargo check --manifest-path services/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, `cargo test --manifest-path services/Cargo.toml -p cex-api`, `pnpm --filter @aether/web lint`, `typecheck`, `test`, and `build`
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

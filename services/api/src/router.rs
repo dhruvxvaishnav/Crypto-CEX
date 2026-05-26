@@ -4,7 +4,7 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 
 use crate::extractors::hmac::hmac_auth_middleware;
-use crate::handlers::account::{faucet, get_balances, get_history, get_profile};
+use crate::handlers::account::{faucet, get_balances, get_history, get_pnl, get_profile};
 use crate::handlers::api_keys::{create_api_key, list_api_keys, revoke_api_key};
 use crate::handlers::auth::{login, refresh, signup};
 use crate::handlers::health::{health, ready};
@@ -12,6 +12,7 @@ use crate::handlers::markets::{get_klines, get_market, get_orderbook, get_trades
 use crate::handlers::orders::{
     cancel_all_orders, cancel_order, get_order, list_orders, place_order,
 };
+use crate::handlers::proof::{latest_proof, my_proof};
 use crate::handlers::totp::{disable_totp, setup_totp, verify_totp};
 use crate::handlers::ws::ws_handler;
 use crate::middleware::{not_found, request_id};
@@ -48,15 +49,21 @@ pub fn build_router(state: AppState) -> Router {
         .route("/account", get(get_profile))
         .route("/account/balances", get(get_balances))
         .route("/account/history", get(get_history))
+        .route("/account/pnl", get(get_pnl))
         .route("/account/api-keys", post(create_api_key).get(list_api_keys))
         .route("/account/api-keys/{id}", delete(revoke_api_key))
         .route("/wallet/faucet", post(faucet));
+
+    let proof_routes = Router::new()
+        .route("/proof-of-reserves/latest", get(latest_proof))
+        .route("/proof-of-reserves/me", get(my_proof));
 
     let api_v1 = Router::new()
         .merge(auth_routes)
         .merge(market_routes)
         .merge(order_routes)
         .merge(account_routes)
+        .merge(proof_routes)
         // HMAC middleware verifies X-AETHER-* headers and injects HmacCaller extension.
         .layer(from_fn_with_state(state.clone(), hmac_auth_middleware))
         // Rate limiting applied after request-id so request context is available.

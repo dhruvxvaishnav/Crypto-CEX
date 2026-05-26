@@ -50,6 +50,17 @@ struct LedgerEntryResponse {
     ts: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PnlResponse {
+    asset: String,
+    qty: String,
+    avg_cost: String,
+    market_price: Option<String>,
+    unrealised_pnl: Option<String>,
+    realised_pnl: String,
+}
+
 // ── Query params ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +187,36 @@ pub async fn get_history(
         "data": body,
         "nextCursor": next_cursor
     })))
+}
+
+/// `GET /account/pnl`
+///
+/// # Errors
+///
+/// Returns [`ApiError`] on DB failure.
+pub async fn get_pnl(
+    State(state): State<AppState>,
+    caller: AuthenticatedUser,
+    axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
+) -> Result<impl IntoResponse, ApiError> {
+    let rows = repo::pnl(&state.db, caller.user_id).await.map_err(|err| {
+        tracing::error!(err = %err, request_id = %ctx.request_id, "account.pnl.db_error");
+        ApiError::internal().with_request_id(ctx.request_id)
+    })?;
+
+    let body: Vec<PnlResponse> = rows
+        .into_iter()
+        .map(|row| PnlResponse {
+            asset: row.asset_symbol,
+            qty: row.quantity.to_string(),
+            avg_cost: row.avg_cost.to_string(),
+            market_price: row.market_price.map(|value| value.to_string()),
+            unrealised_pnl: row.unrealised_pnl.map(|value| value.to_string()),
+            realised_pnl: row.realised_pnl.to_string(),
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({ "data": body })))
 }
 
 /// `POST /wallet/faucet`

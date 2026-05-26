@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, VecDeque};
+
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use time::OffsetDateTime;
@@ -294,6 +296,41 @@ pub struct LedgerRow {
     pub created_at: OffsetDateTime,
 }
 
+/// Trade row used for FIFO P&L computation.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PnlTradeRow {
+    pub asset_symbol: String,
+    pub side: String,
+    pub price: Decimal,
+    pub quantity: Decimal,
+    pub created_at: OffsetDateTime,
+}
+
+/// Current balance row used for P&L quantities.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PnlBalanceRow {
+    pub asset_symbol: String,
+    pub quantity: Decimal,
+}
+
+/// Latest market price for a USDT-quoted asset.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PnlMarketPriceRow {
+    pub asset_symbol: String,
+    pub market_price: Option<Decimal>,
+}
+
+/// Computed FIFO P&L row.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PnlRow {
+    pub asset_symbol: String,
+    pub quantity: Decimal,
+    pub avg_cost: Decimal,
+    pub market_price: Option<Decimal>,
+    pub unrealised_pnl: Option<Decimal>,
+    pub realised_pnl: Decimal,
+}
+
 /// Fetches the user profile.
 ///
 /// # Errors
@@ -377,6 +414,18 @@ pub async fn ledger_history(
     .bind(limit)
     .fetch_all(pool)
     .await
+}
+
+/// Returns FIFO P&L for all non-USDT assets the user has held or traded.
+///
+/// # Errors
+///
+/// Returns `sqlx::Error` on DB failure.
+pub async fn pnl(pool: &PgPool, user_id: Uuid) -> Result<Vec<PnlRow>, sqlx::Error> {
+    let trades = pnl_trades(pool, user_id).await?;
+    let balances = pnl_balances(pool, user_id).await?;
+    let prices = pnl_market_prices(pool).await?;
+    Ok(compute_pnl(trades, balances, prices))
 }
 
 /// Applies a faucet deposit: credits `amount` of `asset_id` to the user's
@@ -467,4 +516,265 @@ pub async fn get_faucet_limit(
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|r| (r.id, r.faucet_max)))
+}
+
+async fn pnl_trades(pool: &PgPool, user_id: Uuid) -> Result<Vec<PnlTradeRow>, sqlx::Error> {
+    sqlx::query_as::<_, PnlTradeRow>(
+        r"
+        SELECT
+            ba.symbol AS asset_symbol,
+            CASE
+                WHEN o.id = t.taker_order_id THEN t.taker_side::TEXT
+                WHEN t.taker_side = 'buy' THEN 'sell'
+                ELSE 'buy'
+            END AS side,
+            t.price,
+            t.quantity,
+            t.created_at
+        FROM trades t
+        JOIN orders o ON o.id = t.taker_order_id OR o.id = t.maker_order_id
+        JOIN markets m ON m.id = t.market_id
+        JOIN assets ba ON ba.id = m.base_asset_id
+        JOIN assets qa ON qa.id = m.quote_asset_id
+        WHERE o.user_id = $1
+          AND qa.symbol = 'USDT'
+        ORDER BY t.created_at ASC, t.engine_seq ASC
+        ",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+async fn pnl_balances(pool: &PgPool, user_id: Uuid) -> Result<Vec<PnlBalanceRow>, sqlx::Error> {
+    sqlx::query_as::<_, PnlBalanceRow>(
+        r"
+        SELECT
+            a.symbol AS asset_symbol,
+            b.available + b.locked AS quantity
+        FROM balances b
+        JOIN assets a ON a.id = b.asset_id
+        WHERE b.user_id = $1
+          AND a.symbol <> 'USDT'
+          AND b.available + b.locked > 0
+        ORDER BY a.symbol
+        ",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+async fn pnl_market_prices(pool: &PgPool) -> Result<Vec<PnlMarketPriceRow>, sqlx::Error> {
+    sqlx::query_as::<_, PnlMarketPriceRow>(
+        r"
+        SELECT
+            ba.symbol AS asset_symbol,
+            (array_agg(k.close ORDER BY k.opened_at DESC))[1] AS market_price
+        FROM markets m
+        JOIN assets ba ON ba.id = m.base_asset_id
+        JOIN assets qa ON qa.id = m.quote_asset_id
+        LEFT JOIN klines k
+               ON k.symbol = m.symbol
+              AND k.interval = '1m'
+              AND k.opened_at >= now() - INTERVAL '24 hours'
+        WHERE qa.symbol = 'USDT'
+          AND m.status <> 'delisted'
+        GROUP BY ba.symbol
+        ORDER BY ba.symbol
+        ",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+fn compute_pnl(
+    trades: Vec<PnlTradeRow>,
+    balances: Vec<PnlBalanceRow>,
+    prices: Vec<PnlMarketPriceRow>,
+) -> Vec<PnlRow> {
+    let mut states = BTreeMap::<String, PnlState>::new();
+    for trade in trades {
+        let state = states.entry(trade.asset_symbol).or_default();
+        if trade.side == "buy" {
+            state.buy(trade.quantity, trade.price);
+        } else {
+            state.sell(trade.quantity, trade.price);
+        }
+    }
+
+    let quantities: BTreeMap<String, Decimal> = balances
+        .into_iter()
+        .map(|balance| (balance.asset_symbol, balance.quantity))
+        .collect();
+    let market_prices: BTreeMap<String, Option<Decimal>> = prices
+        .into_iter()
+        .map(|price| (price.asset_symbol, price.market_price))
+        .collect();
+
+    for asset in quantities.keys() {
+        states.entry(asset.clone()).or_default();
+    }
+
+    states
+        .into_iter()
+        .map(|(asset_symbol, state)| {
+            let quantity = quantities
+                .get(&asset_symbol)
+                .copied()
+                .unwrap_or_else(|| state.remaining_quantity());
+            let remaining_cost = state.remaining_cost();
+            let avg_cost = if quantity > Decimal::ZERO {
+                remaining_cost / quantity
+            } else {
+                Decimal::ZERO
+            };
+            let market_price = market_prices.get(&asset_symbol).copied().flatten();
+            let unrealised_pnl = market_price.map(|price| (price - avg_cost) * quantity);
+            PnlRow {
+                asset_symbol,
+                quantity,
+                avg_cost,
+                market_price,
+                unrealised_pnl,
+                realised_pnl: state.realised_pnl,
+            }
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Default)]
+struct PnlState {
+    lots: VecDeque<CostLot>,
+    realised_pnl: Decimal,
+}
+
+#[derive(Debug, Clone)]
+struct CostLot {
+    quantity: Decimal,
+    unit_cost: Decimal,
+}
+
+impl PnlState {
+    fn buy(&mut self, quantity: Decimal, unit_cost: Decimal) {
+        self.lots.push_back(CostLot {
+            quantity,
+            unit_cost,
+        });
+    }
+
+    fn sell(&mut self, mut quantity: Decimal, price: Decimal) {
+        while quantity > Decimal::ZERO {
+            let Some(front) = self.lots.front_mut() else {
+                self.realised_pnl += price * quantity;
+                break;
+            };
+            let consumed = if front.quantity <= quantity {
+                front.quantity
+            } else {
+                quantity
+            };
+            self.realised_pnl += (price - front.unit_cost) * consumed;
+            front.quantity -= consumed;
+            quantity -= consumed;
+            if front.quantity <= Decimal::ZERO {
+                self.lots.pop_front();
+            }
+        }
+    }
+
+    fn remaining_quantity(&self) -> Decimal {
+        self.lots
+            .iter()
+            .fold(Decimal::ZERO, |total, lot| total + lot.quantity)
+    }
+
+    fn remaining_cost(&self) -> Decimal {
+        self.lots.iter().fold(Decimal::ZERO, |total, lot| {
+            total + (lot.quantity * lot.unit_cost)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn fifo_pnl_consumes_oldest_lots_first() {
+        let asset = "BTC".to_owned();
+        let rows = compute_pnl(
+            vec![
+                trade(&asset, "buy", "100", "1"),
+                trade(&asset, "buy", "120", "1"),
+                trade(&asset, "sell", "150", "1.5"),
+            ],
+            vec![balance(&asset, "0.5")],
+            vec![price(&asset, "200")],
+        );
+
+        assert_eq!(
+            rows,
+            vec![PnlRow {
+                asset_symbol: asset,
+                quantity: decimal("0.5"),
+                avg_cost: decimal("120"),
+                market_price: Some(decimal("200")),
+                unrealised_pnl: Some(decimal("40")),
+                realised_pnl: decimal("65"),
+            }]
+        );
+    }
+
+    #[test]
+    fn pnl_includes_held_asset_without_trade_cost_basis() {
+        let asset = "ETH".to_owned();
+        let rows = compute_pnl(
+            Vec::new(),
+            vec![balance(&asset, "2")],
+            vec![price(&asset, "3000")],
+        );
+
+        assert_eq!(
+            rows,
+            vec![PnlRow {
+                asset_symbol: asset,
+                quantity: decimal("2"),
+                avg_cost: Decimal::ZERO,
+                market_price: Some(decimal("3000")),
+                unrealised_pnl: Some(decimal("6000")),
+                realised_pnl: Decimal::ZERO,
+            }]
+        );
+    }
+
+    fn trade(asset: &str, side: &str, price: &str, quantity: &str) -> PnlTradeRow {
+        PnlTradeRow {
+            asset_symbol: asset.to_owned(),
+            side: side.to_owned(),
+            price: decimal(price),
+            quantity: decimal(quantity),
+            created_at: OffsetDateTime::UNIX_EPOCH,
+        }
+    }
+
+    fn balance(asset: &str, quantity: &str) -> PnlBalanceRow {
+        PnlBalanceRow {
+            asset_symbol: asset.to_owned(),
+            quantity: decimal(quantity),
+        }
+    }
+
+    fn price(asset: &str, market_price: &str) -> PnlMarketPriceRow {
+        PnlMarketPriceRow {
+            asset_symbol: asset.to_owned(),
+            market_price: Some(decimal(market_price)),
+        }
+    }
+
+    fn decimal(value: &str) -> Decimal {
+        Decimal::from_str(value).unwrap_or(Decimal::ZERO)
+    }
 }

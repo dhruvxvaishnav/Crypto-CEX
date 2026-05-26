@@ -7,6 +7,7 @@ pub mod account;
 pub mod markets;
 pub mod orders;
 pub mod postgres;
+pub mod proof;
 
 #[cfg(test)]
 pub mod memory;
