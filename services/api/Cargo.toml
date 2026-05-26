@@ -35,6 +35,11 @@ hmac = { workspace = true }
 totp-rs = { workspace = true }
 redis = { workspace = true }
 utoipa = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry-semantic-conventions = { workspace = true }
 
 [lints]
 workspace = true

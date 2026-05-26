@@ -170,6 +170,22 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
 - [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
 
+## Observability + Deploy (Day 13 — Batch 1)
+
+- [x] Added `opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp`, `tracing-opentelemetry`, `opentelemetry-semantic-conventions` to services workspace deps
+- [x] Created `services/api/src/telemetry.rs`: `OtelGuard` + `init_telemetry()` — wires `TracerProvider` + `SdkMeterProvider` with OTLP gRPC export and `TraceContextPropagator` for W3C traceparent
+- [x] Added `otlp_endpoint: Option<String>` config field (env `OTLP_ENDPOINT`) to all three services
+- [x] Replaced bare `tracing_subscriber::fmt()` init in `api/main.rs`, `settlement/main.rs`, and `market-data/main.rs` with `init_telemetry()` — `_otel_guard` held for process lifetime
+- [x] Rewritten `middleware.rs`: per-request `tracing::info_span!` linked to W3C `traceparent` from incoming headers via `set_parent()` + `instrument()`; records `http_requests_total` counter and `http_request_duration_seconds` histogram via OTel global meter (PRD §19.2)
+- [x] Rewritten `engine_client.rs`: injects W3C `traceparent` into every outbound TCP frame JSON by extracting current tracing span context via `tracing_opentelemetry::OpenTelemetrySpanExt`; added `EngineClientError::Serialization` variant
+- [x] `settlement/main.rs`: added `settlement_events_processed_total` counter and `settlement_lag_seq` gauge (queries `engine_events MAX(seq) - worker_state.last_processed_seq`)
+- [x] Updated `docker-compose.yml`: added `otelcol` (OTel Collector Contrib 0.109.0), `prometheus` (2.53.0), `grafana` (11.2.0) services with proper healthcheck deps and volume mounts
+- [x] Created `infra/observability/otel-collector.yml`: OTLP gRPC/HTTP receivers → batch processor → Jaeger (traces) + Prometheus scrape endpoint (metrics)
+- [x] Created `infra/observability/prometheus.yml`: scrapes OTel collector's `:8889` Prometheus endpoint every 15 s
+- [x] Created Grafana auto-provisioning: `datasources/prometheus.yml` (uid `aether-prometheus`) + `dashboards/dashboards.yml` (file provider pointing to `/etc/grafana/dashboards`)
+- [x] Filled `infra/observability/dashboards/aether.json`: 7 panels covering HTTP RPS, HTTP P50/P95/P99 latency, engine orders/sec, settlement lag, active WS connections, DB pool in use, error rate (PRD §19.4)
+- [x] Verification: `cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets -- -D warnings` clean; `cargo test --manifest-path services/Cargo.toml -p cex-api` 10/10 pass
+
 ## Trading Endpoints + WebSocket Hub (Day 6)
 
 - [x] Fixed pre-existing cold-build breakage: services `rust-toolchain.toml` updated `1.82.0 → 1.95.0` to match lock file (edition-2024 transitive deps). Engine toolchain unchanged. PRD and AGENTS.md updated.

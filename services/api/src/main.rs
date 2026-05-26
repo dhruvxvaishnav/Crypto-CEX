@@ -9,12 +9,12 @@ use cex_api::config::Config;
 use cex_api::engine_client::EngineClient;
 use cex_api::readiness::PgEngineReadiness;
 use cex_api::repositories::postgres::PgAuthRepository;
+use cex_api::telemetry::init_telemetry;
 use cex_api::ws::hub::Hub;
 use cex_api::{build_router, AppState};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
 
 const DB_MAX_CONNECTIONS: u32 = 20;
 const ENGINE_TIMEOUT: Duration = Duration::from_millis(50);
@@ -23,13 +23,11 @@ const ENGINE_EVENT_CHANNEL: usize = 1024;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init()
-        .map_err(|error| anyhow::anyhow!("initialising tracing subscriber: {error}"))?;
-
     let config = Config::from_env().context("loading api config")?;
+
+    // OTel guard must be declared first so it is dropped last, flushing spans.
+    let _otel_guard =
+        init_telemetry("cex-api", config.otlp_endpoint.as_deref()).context("init telemetry")?;
 
     let pool = PgPoolOptions::new()
         .max_connections(DB_MAX_CONNECTIONS)

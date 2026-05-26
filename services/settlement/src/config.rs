@@ -19,6 +19,8 @@ pub struct Config {
     pub bridge_reconnect_interval: Duration,
     /// Idle polling interval when no notification arrives.
     pub poll_interval: Duration,
+    /// OTLP gRPC endpoint for distributed tracing.
+    pub otlp_endpoint: Option<String>,
 }
 
 /// Config loading error.
@@ -68,6 +70,7 @@ impl Config {
                 DEFAULT_BRIDGE_RECONNECT_MS,
             )?),
             poll_interval: Duration::from_millis(poll_ms),
+            otlp_endpoint: optional("OTLP_ENDPOINT"),
         })
     }
 }

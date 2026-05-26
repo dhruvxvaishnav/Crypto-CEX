@@ -29,6 +29,9 @@ pub struct Config {
     pub pgcrypto_key: String,
     /// Whether the faucet endpoint is enabled.
     pub faucet_enabled: bool,
+    /// OTLP gRPC endpoint for distributed tracing, e.g. `http://otelcol:4317`.
+    /// `None` falls back to the default loopback address inside `init_telemetry`.
+    pub otlp_endpoint: Option<String>,
 }
 
 /// Deployment environment.
@@ -90,6 +93,7 @@ impl Config {
             optional("PGCRYPTO_KEY").unwrap_or_else(|| "dev-insecure-key".to_owned());
         let faucet_enabled =
             optional("FAUCET_ENABLED").is_none_or(|v| v.eq_ignore_ascii_case("true"));
+        let otlp_endpoint = optional("OTLP_ENDPOINT");
 
         Ok(Self {
             app_env,
@@ -103,6 +107,7 @@ impl Config {
             refresh_token_ttl: Duration::from_hours(720),
             pgcrypto_key,
             faucet_enabled,
+            otlp_endpoint,
         })
     }
 }

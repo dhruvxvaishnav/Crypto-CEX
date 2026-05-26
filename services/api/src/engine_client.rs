@@ -1,19 +1,23 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use cex_proto::{
-    read_json_frame, write_json_frame, AckResponse, AckResult, BookSnapshot, CancelAck,
-    CancelAllAck, CancelAllRequest, CancelRequest, EngineRequest, EngineResponse,
-    MarketControlRequest, MarketStatusAck, OrderAck, PingRequest, PlaceRequest, RejectResponse,
-    SequencedEngineEvent, SnapshotRequest,
+    read_json_frame, AckResponse, AckResult, BookSnapshot, CancelAck, CancelAllAck,
+    CancelAllRequest, CancelRequest, EngineRequest, EngineResponse, MarketControlRequest,
+    MarketStatusAck, OrderAck, PingRequest, PlaceRequest, RejectResponse, SequencedEngineEvent,
+    SnapshotRequest,
 };
 use dashmap::DashMap;
+use opentelemetry::propagation::Injector;
 use thiserror::Error;
+use tokio::io::AsyncWriteExt as _;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::{oneshot, Mutex};
 use tokio::time::timeout;
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use uuid::Uuid;
 
 /// Errors returned by [`EngineClient`] operations.
@@ -22,6 +26,9 @@ pub enum EngineClientError {
     /// Connection or frame IO failed.
     #[error("engine io failed")]
     Io,
+    /// Request could not be serialised.
+    #[error("engine request serialisation failed")]
+    Serialization,
     /// Request timed out waiting for an engine response.
     #[error("engine timed out")]
     Timeout,
@@ -48,6 +55,9 @@ type PendingMap = Arc<DashMap<Uuid, oneshot::Sender<EngineResponse>>>;
 /// half runs in a background task that dispatches responses to waiting callers
 /// via per-request `oneshot` channels keyed by `requestId`. If the connection
 /// drops, the next call transparently reconnects.
+///
+/// Every outbound frame carries the W3C `traceparent` field so that the engine
+/// spans can be linked to the API parent trace (PRD §19.3).
 #[derive(Clone)]
 pub struct EngineClient {
     addr: SocketAddr,
@@ -235,9 +245,18 @@ impl EngineClient {
         let (tx, rx) = oneshot::channel();
         self.pending.insert(request_id, tx);
 
+        // Capture the W3C traceparent from the current tracing span before
+        // acquiring the write lock to keep the lock hold time minimal.
+        let traceparent = extract_traceparent();
+
+        let payload = serialize_with_traceparent(&request, traceparent).map_err(|_| {
+            self.pending.remove(&request_id);
+            EngineClientError::Serialization
+        })?;
+
         let write_ok = {
             let mut guard = self.writer.lock().await;
-            self.write_or_reconnect(&mut guard, &request).await
+            self.write_or_reconnect(&mut guard, &payload).await
         };
 
         if let Err(e) = write_ok {
@@ -254,7 +273,7 @@ impl EngineClient {
             .map_err(|_| EngineClientError::Io)
     }
 
-    /// Writes `request` to the engine, reconnecting first if needed.
+    /// Writes `payload` bytes to the engine, reconnecting first if needed.
     ///
     /// # Panics
     ///
@@ -262,10 +281,10 @@ impl EngineClient {
     async fn write_or_reconnect(
         &self,
         guard: &mut Option<OwnedWriteHalf>,
-        request: &EngineRequest,
+        payload: &[u8],
     ) -> Result<(), EngineClientError> {
         if let Some(writer) = guard.as_mut() {
-            if write_json_frame(writer, request).await.is_ok() {
+            if write_framed(writer, payload).await.is_ok() {
                 return Ok(());
             }
             *guard = None;
@@ -276,7 +295,7 @@ impl EngineClient {
             .map_err(|_| EngineClientError::Io)?;
         let (read_half, mut write_half) = stream.into_split();
 
-        write_json_frame(&mut write_half, request)
+        write_framed(&mut write_half, payload)
             .await
             .map_err(|_| EngineClientError::Io)?;
 
@@ -288,6 +307,51 @@ impl EngineClient {
         *guard = Some(write_half);
         Ok(())
     }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Adapter so `TextMapPropagator::inject_context` can write into a [`HashMap`].
+struct HashMapCarrier(HashMap<String, String>);
+
+impl Injector for HashMapCarrier {
+    fn set(&mut self, key: &str, value: String) {
+        self.0.insert(key.to_owned(), value);
+    }
+}
+
+/// Extracts the W3C `traceparent` string from the currently-active tracing span.
+fn extract_traceparent() -> Option<String> {
+    let ctx = tracing::Span::current().context();
+    let mut carrier = HashMapCarrier(HashMap::new());
+    opentelemetry::global::get_text_map_propagator(|prop| {
+        prop.inject_context(&ctx, &mut carrier);
+    });
+    carrier.0.remove("traceparent")
+}
+
+/// Serialises the request to JSON and injects an optional `traceparent` field.
+///
+/// The engine server ignores unknown top-level fields (serde default), so the
+/// extra field propagates safely without breaking the engine wire protocol.
+fn serialize_with_traceparent(
+    request: &EngineRequest,
+    traceparent: Option<String>,
+) -> Result<Vec<u8>, serde_json::Error> {
+    let mut value = serde_json::to_value(request)?;
+    if let (Some(tp), Some(map)) = (traceparent, value.as_object_mut()) {
+        map.insert("traceparent".to_owned(), serde_json::Value::String(tp));
+    }
+    serde_json::to_vec(&value)
+}
+
+/// Writes a length-prefixed frame to `writer`.
+async fn write_framed(writer: &mut OwnedWriteHalf, payload: &[u8]) -> std::io::Result<()> {
+    let len = u32::try_from(payload.len())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "frame too large"))?;
+    writer.write_all(&len.to_be_bytes()).await?;
+    writer.write_all(payload).await?;
+    writer.flush().await
 }
 
 /// Reads engine responses and dispatches them to waiting callers.

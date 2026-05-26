@@ -22,6 +22,8 @@ pub struct Config {
     pub quote_refresh_interval: Duration,
     /// Maximum allowed upstream feed age before quoting stops.
     pub stale_after: Duration,
+    /// OTLP gRPC endpoint for distributed tracing.
+    pub otlp_endpoint: Option<String>,
 }
 
 /// Config loading error.
@@ -68,6 +70,7 @@ impl Config {
                 "MARKET_DATA_STALE_AFTER_MS",
                 DEFAULT_STALE_AFTER_MS,
             )?),
+            otlp_endpoint: optional("OTLP_ENDPOINT"),
         })
     }
 }

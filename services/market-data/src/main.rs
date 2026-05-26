@@ -1,27 +1,35 @@
 use std::collections::BTreeSet;
 
-use anyhow::Context;
+use anyhow::Context as _;
 use cex_market_data::binance::{default_top_usdt_symbols, run_reconnecting_stream, BinanceEvent};
 use cex_market_data::engine::EngineClient;
 use cex_market_data::market_maker::MarketMaker;
 use cex_market_data::persistence::MarketDataRepository;
 use cex_market_data::Config;
+use opentelemetry::{global, trace::TracerProvider as _, KeyValue};
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_sdk::{
+    propagation::TraceContextPropagator,
+    runtime::Tokio,
+    trace::{BatchSpanProcessor, TracerProvider},
+    Resource,
+};
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
+use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _, EnvFilter};
 
 const BINANCE_EVENT_CAPACITY: usize = 4_096;
 const DB_MAX_CONNECTIONS: u32 = 5;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init()
-        .map_err(|error| anyhow::anyhow!("initialising tracing subscriber: {error}"))?;
-
     let config = Config::from_env().context("loading market-data config")?;
+
+    let _otel_guard = init_telemetry("cex-market-data", config.otlp_endpoint.as_deref())
+        .context("init telemetry")?;
+
     let pool = PgPoolOptions::new()
         .max_connections(DB_MAX_CONNECTIONS)
         .connect(&config.database_url)
@@ -124,4 +132,36 @@ fn stream_symbols(local_symbols: &[String]) -> Vec<String> {
         .collect::<BTreeSet<_>>();
     symbols.extend(local_symbols.iter().cloned());
     symbols.into_iter().collect()
+}
+
+fn init_telemetry(
+    service: &'static str,
+    otlp_endpoint: Option<&str>,
+) -> anyhow::Result<TracerProvider> {
+    let resource = Resource::new(vec![KeyValue::new(SERVICE_NAME, service)]);
+    let endpoint = otlp_endpoint.unwrap_or("http://127.0.0.1:4317");
+
+    let span_exporter = SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(endpoint)
+        .build()
+        .context("building OTLP span exporter")?;
+
+    let tracer_provider = TracerProvider::builder()
+        .with_resource(resource)
+        .with_span_processor(BatchSpanProcessor::builder(span_exporter, Tokio).build())
+        .build();
+
+    global::set_tracer_provider(tracer_provider.clone());
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let tracer = tracer_provider.tracer(service);
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().json())
+        .with(OpenTelemetryLayer::new(tracer))
+        .try_init()
+        .map_err(|e| anyhow::anyhow!("initialising tracing subscriber: {e}"))?;
+
+    Ok(tracer_provider)
 }

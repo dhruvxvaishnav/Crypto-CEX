@@ -368,9 +368,9 @@ fn engine_error(error: &EngineClientError, request_id: Uuid) -> ApiError {
             "Engine rejected the admin command",
         )
         .with_request_id(request_id),
-        EngineClientError::Io | EngineClientError::Unexpected => {
-            ApiError::internal().with_request_id(request_id)
-        }
+        EngineClientError::Io
+        | EngineClientError::Serialization
+        | EngineClientError::Unexpected => ApiError::internal().with_request_id(request_id),
     }
 }
 

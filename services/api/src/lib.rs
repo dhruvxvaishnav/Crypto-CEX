@@ -16,6 +16,7 @@ pub mod router;
 pub mod schemas;
 pub mod security_headers;
 pub mod state;
+pub mod telemetry;
 pub mod ws;
 
 pub use router::build_router;

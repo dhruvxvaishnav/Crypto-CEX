@@ -40,6 +40,11 @@ hmac = "0.12"
 totp-rs = { version = "5", features = ["qr"] }
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 utoipa = { version = "4", features = ["axum_extras"] }
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio", "metrics"] }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic", "metrics"] }
+tracing-opentelemetry = "0.28"
+opentelemetry-semantic-conventions = "0.27"
 
 [workspace.lints.rust]
 non_snake_case = "deny"
