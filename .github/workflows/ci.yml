@@ -25,7 +25,7 @@ jobs:
       - run: pnpm build
 
   rust:
-    name: rust
+    name: rust (engine)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,12 +42,55 @@ jobs:
       - run: cargo check --workspace
       - run: cargo nextest run --workspace --all-features
 
+  rust-services:
+    name: rust (services)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services
+      # All service tests are in-memory (no Postgres service needed).
+      - run: cargo check --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo nextest run --workspace
+
+  lighthouse:
+    name: lighthouse
+    runs-on: ubuntu-latest
+    needs: [typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.8
+      - run: pnpm install --frozen-lockfile
+      # Build the production Next.js bundle before Lighthouse starts the server.
+      - run: pnpm --filter @aether/web build
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          configPath: ./web/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest
     needs:
       - typescript
       - rust
+      - rust-services
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

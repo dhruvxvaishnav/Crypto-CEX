@@ -4,6 +4,25 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### CI Hardening (Day 13 — Batch 2)
+
+- Added `rust-services` CI job (Rust 1.95.0) that runs `cargo check`, `cargo clippy -D warnings`, and `cargo nextest run` across the full services workspace on every PR — previously only the engine was CI-tested.
+- Added `lighthouse` CI job using `treosh/lighthouse-ci-action@v11` that builds the Next.js app and audits the landing page against PRD §17.6 thresholds (≥90 performance, ≥95 accessibility, ≥90 best-practices, ≥95 SEO).
+- Added `web/lighthouserc.json` with `lighthouse:no-pwa` preset and explicit `minScore` assertions for all four categories.
+- `e2e` job now depends on both `rust` (engine) and `rust-services` so a services build failure blocks E2E.
+
+### Observability (Day 13 — Batch 1)
+
+- Added OpenTelemetry SDK (`opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp`, `tracing-opentelemetry`, `opentelemetry-semantic-conventions`) to all three Rust services.
+- Added `services/api/src/telemetry.rs`: `OtelGuard` + `init_telemetry()` — wires `TracerProvider` + `SdkMeterProvider` with OTLP gRPC export and W3C `TraceContextPropagator`.
+- Added `OTLP_ENDPOINT` env var to all three service configs; falls back to `http://127.0.0.1:4317`.
+- API middleware now creates a per-request tracing span linked to upstream `traceparent`, records `http_requests_total` and `http_request_duration_seconds` (PRD §19.2).
+- Engine client injects W3C `traceparent` into every outbound TCP frame so engine spans link to the API parent trace (PRD §19.3).
+- Settlement worker emits `settlement_lag_seq` gauge (live DB query) and `settlement_events_processed_total` counter.
+- Updated `docker-compose.yml` to add OTel Collector Contrib, Prometheus, and Grafana with full auto-provisioning.
+- Added `infra/observability/otel-collector.yml`, `prometheus.yml`, and Grafana datasource/dashboard provisioning configs.
+- Filled `infra/observability/dashboards/aether.json` with 7 panels covering all PRD §19.4 requirements.
+
 ### Differentiators (Day 12)
 
 - Added proof-of-reserves snapshot generation from live customer liabilities, Merkle root commitment to `proof_of_reserves`, public latest-root API, and authenticated per-user proof API.

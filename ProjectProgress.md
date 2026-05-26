@@ -170,6 +170,14 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
 - [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
 
+## CI Hardening (Day 13 — Batch 2)
+
+- [x] Added `rust-services` CI job to `.github/workflows/ci.yml` using Rust 1.95.0, running `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo nextest run --workspace` (all service tests are in-memory — no Postgres service container needed)
+- [x] Added `lighthouse` CI job using `treosh/lighthouse-ci-action@v11`; builds the Next.js app then audits `http://localhost:3000/` against PRD §17.6 thresholds
+- [x] Created `web/lighthouserc.json` with `lighthouse:no-pwa` preset and `minScore` assertions: performance ≥0.9, accessibility ≥0.95, best-practices ≥0.9, SEO ≥0.95
+- [x] `e2e` job gate expanded to depend on `rust`, `rust-services` (in addition to `typescript`) so a services compilation failure blocks E2E runs
+- [x] Renamed existing `rust` job to `rust (engine)` for clarity; new job named `rust (services)`
+
 ## Observability + Deploy (Day 13 — Batch 1)
 
 - [x] Added `opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp`, `tracing-opentelemetry`, `opentelemetry-semantic-conventions` to services workspace deps
