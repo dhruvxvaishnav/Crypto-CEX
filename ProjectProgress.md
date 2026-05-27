@@ -170,6 +170,19 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
 - [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
 
+## E2E Tests (Day 13 — Batch 4)
+
+- [x] Updated `web/playwright.config.ts`: `globalSetup`, `PLAYWRIGHT_BASE_URL` + `API_BASE_URL` env-var overrides, `maxFailures: 3` in CI, screenshot/video on failure; `webServer` omitted when `PLAYWRIGHT_BASE_URL` is set (for deployed-env runs)
+- [x] Updated `web/tsconfig.json`: added `playwright.config.ts` and `e2e/**/*.ts` to include for Node.js type access
+- [x] Created `web/e2e/global-setup.ts`: pings `API_BASE/health` before specs; logs clear warning if backend unreachable
+- [x] Created `web/e2e/fixtures.ts`: `authedPage` fixture, inline TOTP generator (RFC 6238, SHA-1, base32, no deps), inline HMAC-SHA256 signer matching Rust `extractors/hmac.rs` payload, `getAccessToken` (reads zustand sessionStorage), `signUpAndLogin` helper
+- [x] Created `web/e2e/auth.spec.ts` — E2E-01: full signup → 2FA setup (intercepts `/auth/2fa/setup` response for secret) → verify TOTP → logout → login → 2FA challenge → assert `/trade/**`
+- [x] Created `web/e2e/orders.spec.ts` — E2E-02: faucet 1000 USDT → limit buy at price 1 → `aria-label="Cancel order"` → assert order gone
+- [x] Created `web/e2e/fills.spec.ts` — E2E-03: faucet 5000 USDT → market buy 10 USDT → Fills tab row → portfolio BTC balance (requires market-maker worker; degrades gracefully)
+- [x] Created `web/e2e/api-key.spec.ts` — E2E-04: signup via browser → faucet via `request` context → create key via JWT → HMAC-sign `POST /orders` with `X-AETHER-{KEY,TS,SIGN}` headers → assert 201
+- [x] Created `web/e2e/replay.spec.ts` — E2E-05: `/markets/BTCUSDT/replay?from=<1h_ago>&speed=4` → Play → Pause visible → slider advances; speed 1x/4x/16x buttons render; graceful degradation when no frames
+- [x] Verification: `pnpm typecheck` clean (0 errors), `pnpm test` 32/32 passing
+
 ## Deployment Configs (Day 13 — Batch 3)
 
 - [x] Added multi-stage Dockerfiles for all four services using `rust:1.82-slim`/`rust:1.95-slim` → `debian:bookworm-slim`; services Dockerfiles copy both `engine/` and `services/` (path dep on `cex-proto`)

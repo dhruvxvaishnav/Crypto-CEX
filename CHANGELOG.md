@@ -4,6 +4,18 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### E2E Tests (Day 13 — Batch 4)
+
+- Added `web/e2e/global-setup.ts`: checks API backend reachability before any spec runs; prints a clear warning when the Rust stack isn't up.
+- Added `web/e2e/fixtures.ts`: `authedPage` fixture (signup + login via UI for each test), `generateTotp` (RFC 6238, no deps), `buildHmacSignature` (HMAC-SHA256 matching `extractors/hmac.rs` payload format), `getAccessToken` (reads sessionStorage `aether-auth`), `signUpAndLogin`.
+- Added `web/e2e/auth.spec.ts` — **E2E-01**: sign up → start 2FA setup → intercept `secret` from API response → verify TOTP code → log out → log in → complete 2FA challenge → assert on `/trade/**`.
+- Added `web/e2e/orders.spec.ts` — **E2E-02**: faucet 1000 USDT → place limit buy → assert open order in activity panel → cancel → assert order gone.
+- Added `web/e2e/fills.spec.ts` — **E2E-03**: faucet → market buy → assert fill row in Fills tab → assert BTC balance on portfolio page (requires market-maker worker).
+- Added `web/e2e/api-key.spec.ts` — **E2E-04**: signup → faucet via API → create API key → build HMAC-signed `POST /orders` → assert 201 (full round-trip of the Binance-compatible signing scheme).
+- Added `web/e2e/replay.spec.ts` — **E2E-05**: open `/markets/BTCUSDT/replay?from=…&speed=4` → Play → assert Pause visible and slider advances; speed buttons 1x/4x/16x all rendered; degrades gracefully when no historical data available.
+- Updated `web/playwright.config.ts`: added `globalSetup`, `PLAYWRIGHT_BASE_URL` env-var override, `API_BASE_URL` support, screenshot/video on failure, `maxFailures` in CI mode.
+- Updated `web/tsconfig.json`: added `playwright.config.ts` and `e2e/**/*.ts` to `include` so Node.js types are available in E2E files.
+
 ### Deployment (Day 13 — Batch 3)
 
 - Added multi-stage Dockerfiles for all four services: `engine/Dockerfile` (Rust 1.82-slim), `services/api/Dockerfile`, `services/settlement/Dockerfile`, `services/market-data/Dockerfile` (all Rust 1.95-slim → debian:bookworm-slim runtime).
