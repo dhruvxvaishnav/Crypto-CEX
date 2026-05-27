@@ -4,6 +4,14 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### Runbooks (Day 13 — Batch 5)
+
+- Rewrote `docs/runbooks/engine-restart.md` with full pre-restart checklist, WAL-corrupt escalation path, and post-restart order-intake verification commands.
+- Rewrote `docs/runbooks/settlement-stuck.md` with lag-diagnosis SQL, three root-cause branches (crash, Neon cold-start, long-running lock), and a post-recovery ledger invariant check.
+- Rewrote `docs/runbooks/db-migration.md` with local and Neon production apply procedures, lock-impact estimation guidelines, rollback strategy, and a post-migration checklist.
+- Rewrote `docs/runbooks/incident-response.md` with a severity matrix, detect → contain → investigate → resolve → post-mortem template, and cross-links to all specialist runbooks.
+- Added Day 13 entry to `docs/journal.md`.
+
 ### E2E Tests (Day 13 — Batch 4)
 
 - Added `web/e2e/global-setup.ts`: checks API backend reachability before any spec runs; prints a clear warning when the Rust stack isn't up.

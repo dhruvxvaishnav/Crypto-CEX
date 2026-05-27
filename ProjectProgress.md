@@ -170,6 +170,22 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
 - [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
 
+## Runbooks (Day 13 — Batch 5)
+
+- [x] Rewrote `docs/runbooks/engine-restart.md`: pre-checks (settlement lag, engine seq), halt-on-lag, Fly restart/redeploy steps, post-restart verification, WAL-corrupt escalation
+- [x] Rewrote `docs/runbooks/settlement-stuck.md`: lag diagnosis SQL, three root causes (crash/Neon/lock), lag watch loop, ledger invariant check before market resume
+- [x] Rewrote `docs/runbooks/db-migration.md`: lock-impact estimation, local + Neon production apply, two-step NOT NULL pattern, rollback strategy, post-migration checklist
+- [x] Rewrote `docs/runbooks/incident-response.md`: P1–P4 severity matrix, detect→contain→investigate→resolve flow, post-incident journal template, emergency contacts
+- [x] Updated `docs/journal.md` with Day 13 outcome summary
+
+---
+**Day 13 complete.** All PRD §21 Day 13 deliverables shipped:
+- [x] OTel everywhere (traces + metrics); Grafana dashboard JSON committed ✓
+- [x] Lighthouse CI thresholds enforced (`web/lighthouserc.json`, `lighthouse` CI job) ✓
+- [x] Fly.io deploy configs + Vercel + Neon docs (`infra/fly/`, `vercel.json`, `.env.production.example`, `make deploy`) ✓
+- [x] All 5 Playwright E2E scenarios written and type-checked ✓
+- [x] Runbooks fleshed out (§19.5: engine-restart, settlement-stuck, db-migration, incident-response) ✓
+
 ## E2E Tests (Day 13 — Batch 4)
 
 - [x] Updated `web/playwright.config.ts`: `globalSetup`, `PLAYWRIGHT_BASE_URL` + `API_BASE_URL` env-var overrides, `maxFailures: 3` in CI, screenshot/video on failure; `webServer` omitted when `PLAYWRIGHT_BASE_URL` is set (for deployed-env runs)
