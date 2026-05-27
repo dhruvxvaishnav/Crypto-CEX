@@ -1,0 +1,5 @@
+# Applies when build context = engine/ (engine Dockerfile).
+target/
+.git
+benches/criterion
+*.md

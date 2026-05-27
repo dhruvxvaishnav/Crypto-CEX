@@ -1,0 +1,31 @@
+# Exclude large artifacts and files not needed by any Rust service build.
+# Applies when build context = repo root (services/api, settlement, market-data).
+
+.git
+.github
+
+# Frontend — not needed for Rust builds
+web
+
+# Rust build artefacts
+engine/target
+services/target
+
+# Node artefacts
+node_modules
+packages/shared/node_modules
+
+# IDE and OS noise
+.DS_Store
+**/*.swp
+**/*.swo
+
+# Local env and secrets — never bake into images
+.env
+.env.local
+.env.production
+
+# Docs and CI config — not needed at runtime
+docs
+*.md
+infra/compose

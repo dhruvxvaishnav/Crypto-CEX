@@ -1,0 +1,25 @@
+# Aether — Settlement worker (Fly.io)
+# Background worker; no HTTP/TCP listener.
+# Required secrets: DATABASE_URL, ENGINE_HOST, ENGINE_PORT, OTLP_ENDPOINT (optional)
+#
+# Deploy: fly deploy --config infra/fly/settlement/fly.toml
+
+app            = "aether-settlement"
+primary_region = "sin"
+kill_signal    = "SIGTERM"
+kill_timeout   = "10s"
+
+[build]
+  dockerfile = "services/settlement/Dockerfile"
+  context    = "../../.."
+
+[env]
+  ENGINE_HOST = "aether-engine.internal"
+  ENGINE_PORT = "7878"
+
+# No [http_service] — this is a headless background worker.
+
+[[vm]]
+  memory   = "256mb"
+  cpu_kind = "shared"
+  cpus     = 1

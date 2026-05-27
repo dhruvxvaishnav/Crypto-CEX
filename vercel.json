@@ -1,0 +1,7 @@
+{
+  "buildCommand": "pnpm --filter @aether/web build",
+  "outputDirectory": "web/.next",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "devCommand": "pnpm --filter @aether/web dev"
+}

@@ -1,0 +1,43 @@
+# Aether — Matching engine (Fly.io)
+# Internal TCP service — not exposed to the public internet.
+# Reached by other apps via Fly private networking: aether-engine.internal:7878
+#
+# First-time setup:
+#   fly volumes create engine_wal --size 1 --region sin --app aether-engine
+#
+# Deploy: fly deploy --config infra/fly/engine/fly.toml
+
+app            = "aether-engine"
+primary_region = "sin"
+kill_signal    = "SIGTERM"
+kill_timeout   = "10s"
+
+[build]
+  dockerfile = "engine/Dockerfile"
+  context    = "../../../engine"
+
+[env]
+  # Bind to all interfaces so Fly private network can reach the TCP port.
+  ENGINE_HOST = "0.0.0.0"
+  ENGINE_PORT = "7878"
+
+# WAL data persisted across restarts via a Fly volume.
+[mounts]
+  source      = "engine_wal"
+  destination = "/data"
+
+# TCP service on the private network only (no public ports).
+[[services]]
+  internal_port = 7878
+  protocol      = "tcp"
+
+  [[services.tcp_checks]]
+    grace_period  = "15s"
+    interval      = "30s"
+    restart_limit = 0
+    timeout       = "2s"
+
+[[vm]]
+  memory   = "1gb"
+  cpu_kind = "shared"
+  cpus     = 1

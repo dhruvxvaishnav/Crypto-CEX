@@ -1,0 +1,48 @@
+# Aether — API service (Fly.io)
+# Deploy: fly deploy --config infra/fly/api/fly.toml
+# Required secrets (fly secrets set KEY=VALUE):
+#   DATABASE_URL, REDIS_URL, JWT_SECRET, PGCRYPTO_KEY
+#   ENGINE_HOST (= aether-engine.internal), OTLP_ENDPOINT (optional)
+
+app            = "aether-api"
+primary_region = "sin"
+kill_signal    = "SIGTERM"
+kill_timeout   = "5s"
+
+[build]
+  # Context is the repo root so cex-proto path dep is available.
+  dockerfile = "services/api/Dockerfile"
+  context    = "../../.."
+
+[env]
+  APP_ENV          = "production"
+  API_HOST         = "0.0.0.0"
+  API_PORT         = "8080"
+  ENGINE_HOST      = "aether-engine.internal"
+  ENGINE_PORT      = "7878"
+  FAUCET_ENABLED   = "false"
+
+[http_service]
+  internal_port        = 8080
+  force_https          = true
+  auto_stop_machines   = true
+  auto_start_machines  = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval     = "15s"
+  method       = "GET"
+  path         = "/health"
+  protocol     = "http"
+  timeout      = "2s"
+
+[[vm]]
+  memory   = "512mb"
+  cpu_kind = "shared"
+  cpus     = 1

@@ -4,6 +4,18 @@ All notable changes to Aether are recorded here.
 
 ## [Unreleased]
 
+### Deployment (Day 13 — Batch 3)
+
+- Added multi-stage Dockerfiles for all four services: `engine/Dockerfile` (Rust 1.82-slim), `services/api/Dockerfile`, `services/settlement/Dockerfile`, `services/market-data/Dockerfile` (all Rust 1.95-slim → debian:bookworm-slim runtime).
+- Added `.dockerignore` at repo root (excludes `web/`, `*/target/`, `.git`) and `engine/.dockerignore`.
+- Added `infra/fly/api/fly.toml`, `infra/fly/engine/fly.toml`, `infra/fly/settlement/fly.toml`, `infra/fly/market-data/fly.toml` for Fly.io Singapore region (`sin`).
+- Engine fly.toml mounts a persistent volume (`engine_wal` at `/data`) for WAL crash-recovery files.
+- Added `ENGINE_HOST`/`ENGINE_PORT` env-var support to `engine/crates/server/src/main.rs` so the engine can bind to `0.0.0.0` in containerised deployments without breaking the loopback default for local dev.
+- Added `vercel.json` at repo root with pnpm monorepo build commands for Vercel Next.js hosting.
+- Added `.env.production.example` documenting all required production secrets and env vars.
+- Updated `Makefile` with `deploy`, `deploy-api`, `deploy-engine`, `deploy-settlement`, `deploy-market-data`, and `deploy-vercel` targets.
+- Replaced `infra/fly/README.md` placeholder with a complete step-by-step guide: Neon DB setup, Upstash Redis, Fly app creation, volume creation, secrets, deploy order, Vercel frontend, verification, scaling, and rollback.
+
 ### CI Hardening (Day 13 — Batch 2)
 
 - Added `rust-services` CI job (Rust 1.95.0) that runs `cargo check`, `cargo clippy -D warnings`, and `cargo nextest run` across the full services workspace on every PR — previously only the engine was CI-tested.

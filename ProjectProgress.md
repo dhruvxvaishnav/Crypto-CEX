@@ -170,6 +170,18 @@ This local file is intentionally git-ignored. Use it as a scratch progress board
 - [x] Fixed stale frontend auth paths so protected pages redirect to `/login` and links use `/login`, `/signup`, `/forgot`, and `/2fa`
 - [x] Full Day 12 verification passed: `pnpm check`, `pnpm build`, `pnpm e2e`, `cargo test --manifest-path services/Cargo.toml --workspace`, `cargo test --manifest-path engine/Cargo.toml --workspace`, `cargo clippy --manifest-path services/Cargo.toml -p cex-api --all-targets -- -D warnings`, and in-app browser smoke checks for replay/admin routing
 
+## Deployment Configs (Day 13 — Batch 3)
+
+- [x] Added multi-stage Dockerfiles for all four services using `rust:1.82-slim`/`rust:1.95-slim` → `debian:bookworm-slim`; services Dockerfiles copy both `engine/` and `services/` (path dep on `cex-proto`)
+- [x] Added `.dockerignore` at repo root and `engine/.dockerignore` to exclude `target/`, `web/`, `.git` from build contexts
+- [x] Added `ENGINE_HOST`/`ENGINE_PORT` env-var reading to `engine/crates/server/src/main.rs`; defaults to loopback for local dev, set to `0.0.0.0` in Fly.io `[env]` section
+- [x] Created `infra/fly/{api,engine,settlement,market-data}/fly.toml` for Fly.io Singapore region (`sin`); engine app has persistent volume mount at `/data` for WAL files; API has health-check on `/health`; workers are headless (no `[http_service]`)
+- [x] Added `vercel.json` at repo root with pnpm monorepo build/install commands for Vercel Next.js auto-detection
+- [x] Added `.env.production.example` documenting `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `PGCRYPTO_KEY`, `OTLP_ENDPOINT`, `NEXT_PUBLIC_*` variables with format examples
+- [x] Updated `Makefile` with `deploy` (all services), `deploy-api/engine/settlement/market-data`, `deploy-vercel`, and `fly-secrets-*` helper targets
+- [x] Replaced `infra/fly/README.md` with a complete step-by-step guide: Neon + Upstash setup, `fly apps create`, volume create, secrets, deploy order, Vercel env vars, verification, scaling, rollback
+- [x] Verification: `cargo check --manifest-path engine/Cargo.toml --workspace` and `cargo check --manifest-path services/Cargo.toml --workspace --all-targets` both clean
+
 ## CI Hardening (Day 13 — Batch 2)
 
 - [x] Added `rust-services` CI job to `.github/workflows/ci.yml` using Rust 1.95.0, running `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo nextest run --workspace` (all service tests are in-memory — no Postgres service container needed)

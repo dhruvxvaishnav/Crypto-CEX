@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use anyhow::Context;
 use cex_server::{EngineServer, EngineServerConfig};
 use tokio_util::sync::CancellationToken;
@@ -11,8 +13,18 @@ async fn main() -> anyhow::Result<()> {
         .try_init()
         .map_err(|error| anyhow::anyhow!("initialising tracing subscriber: {error}"))?;
 
+    // Allow the bind address to be overridden at deploy time.
+    // Defaults to 127.0.0.1 (loopback) for local dev; set ENGINE_HOST=0.0.0.0
+    // in containerised deployments to accept connections from the private network.
+    let mut config = EngineServerConfig::default();
+    if let Some(bind_addr) = engine_bind_addr() {
+        config.bind_addr = bind_addr;
+    }
+
+    tracing::info!(bind_addr = %config.bind_addr, "engine.starting");
+
     let cancellation = CancellationToken::new();
-    let server = EngineServer::new(EngineServerConfig::default());
+    let server = EngineServer::new(config);
     let run = server.run(cancellation.clone());
     tokio::pin!(run);
 
@@ -30,4 +42,19 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Reads `ENGINE_HOST` + `ENGINE_PORT` from the environment.
+///
+/// Returns `None` when neither variable is set (local dev default is used).
+fn engine_bind_addr() -> Option<SocketAddr> {
+    let host = std::env::var("ENGINE_HOST").ok()?;
+    let port = std::env::var("ENGINE_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .unwrap_or(7878);
+    let ip: IpAddr = host
+        .parse()
+        .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    Some(SocketAddr::new(ip, port))
 }
